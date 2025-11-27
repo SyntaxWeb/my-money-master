@@ -21,7 +21,6 @@ export default function Dashboard() {
   const [mesSelecionado, setMesSelecionado] = useState(
     mesesDisponiveis[0] || new Date().toISOString().slice(0, 7)
   );
-
   const balanco = getBalancoMensal(mesSelecionado);
   const insights = getInsights(mesSelecionado);
 
@@ -42,12 +41,17 @@ export default function Dashboard() {
 
   const lineDataMeses = mesesDisponiveis.slice(0, 6).reverse().map(mes => {
     const b = getBalancoMensal(mes);
+
+    const [ano, mesNum] = mes.split('-').map(Number);
+    const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
+
     return {
-      mes: new Date(mes + '-01').toLocaleDateString('pt-BR', { month: 'short' }),
+      mes: data.toLocaleDateString('pt-BR', { month: 'short' }),
       saldoMes: b.saldoMes,
       saldoAcumulado: b.saldoAcumulado,
       cartao: b.gastosPorCategoria.cartao,
     };
+
   });
 
   return (
@@ -80,7 +84,11 @@ export default function Dashboard() {
           >
             {mesesDisponiveis.map(mes => (
               <option key={mes} value={mes}>
-                {new Date(mes + '-01').toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' })}
+                {(() => {
+                  const [ano, mesNum] = mes.split('-').map(Number);
+                  const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
+                  return data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+                })()}
               </option>
             ))}
           </select>
@@ -145,10 +153,9 @@ export default function Dashboard() {
               <CardTitle>Comparativo com Mês Anterior</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className={`text-lg font-semibold ${
-                comparativo.situacao === 'melhorando' ? 'text-green-600' :
+              <div className={`text-lg font-semibold ${comparativo.situacao === 'melhorando' ? 'text-green-600' :
                 comparativo.situacao === 'piorando' ? 'text-red-600' : 'text-yellow-600'
-              }`}>
+                }`}>
                 Situação: {comparativo.situacao.toUpperCase()}
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -200,11 +207,10 @@ export default function Dashboard() {
               {insights.map((insight, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 rounded-md ${
-                    insight.tipo === 'alerta' ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100' :
+                  className={`p-3 rounded-md ${insight.tipo === 'alerta' ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100' :
                     insight.tipo === 'dica' ? 'bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-100' :
-                    'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100'
-                  }`}
+                      'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100'
+                    }`}
                 >
                   {insight.mensagem}
                 </div>

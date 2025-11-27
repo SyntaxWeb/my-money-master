@@ -149,13 +149,17 @@ export default function Despesas() {
             const totalMes = dividasDoMes.reduce((sum, d) => sum + d.valor, 0);
             const pagas = dividasDoMes.filter(d => d.status === 'paga').length;
             const abertas = dividasDoMes.filter(d => d.status === 'aberta').length;
-            
+
             return (
               <Card key={mes}>
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>
-                      {new Date(mes + '-01').toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' })}
+                      {(() => {
+                        const [ano, mesNum] = mes.split('-').map(Number);
+                        const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
+                        return data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+                      })()}
                     </CardTitle>
                     <div className="text-right">
                       <div className="text-lg font-bold text-red-600">
@@ -172,9 +176,8 @@ export default function Despesas() {
                     {dividasDoMes.map(divida => (
                       <div
                         key={divida.id}
-                        className={`flex justify-between items-center p-3 border rounded-md ${
-                          divida.status === 'paga' ? 'border-green-600 bg-green-50 dark:bg-green-950/20' : 'border-border'
-                        }`}
+                        className={`flex justify-between items-center p-3 border rounded-md ${divida.status === 'paga' ? 'border-green-600 bg-green-50 dark:bg-green-950/20' : 'border-border'
+                          }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">

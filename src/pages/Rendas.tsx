@@ -118,13 +118,17 @@ export default function Rendas() {
           {mesesOrdenados.map(mes => {
             const rendasDoMes = rendasPorMes[mes];
             const totalMes = rendasDoMes.reduce((sum, r) => sum + r.valor, 0);
-            
+
             return (
               <Card key={mes}>
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>
-                      {new Date(mes + '-01').toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' })}
+                      {(() => {
+                        const [ano, mesNum] = mes.split('-').map(Number);
+                        const data = new Date(ano, mesNum - 1, 1);
+                        return data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+                      })()}
                     </CardTitle>
                     <div className="text-lg font-bold text-green-600">
                       Total: R$ {totalMes.toFixed(2)}
