@@ -51,13 +51,33 @@ export const useFinanceData = () => {
     saveRendas(rendas.filter(r => r.id !== id));
   };
 
+  const getSaldoAcumuladoAteOMes = (mesAlvo: string): number => {
+    const mesesOrdenados = getMesesDisponiveis().sort();
+    const indiceMesAlvo = mesesOrdenados.indexOf(mesAlvo);
+    
+    if (indiceMesAlvo === -1) return 0;
+    
+    let saldoAcumulado = 0;
+    for (let i = 0; i <= indiceMesAlvo; i++) {
+      const mes = mesesOrdenados[i];
+      const rendasMes = rendas.filter(r => r.mes === mes);
+      const dividasMes = dividas.filter(d => d.mes === mes);
+      const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
+      const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
+      saldoAcumulado += (totalRenda - totalDivida);
+    }
+    
+    return saldoAcumulado;
+  };
+
   const getBalancoMensal = (mes: string): BalancoMensal => {
     const rendasMes = rendas.filter(r => r.mes === mes);
     const dividasMes = dividas.filter(d => d.mes === mes);
 
     const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
     const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
-    const saldo = totalRenda - totalDivida;
+    const saldoMes = totalRenda - totalDivida;
+    const saldoAcumulado = getSaldoAcumuladoAteOMes(mes);
 
     const gastosPorCategoria = {
       cartao: dividasMes.filter(d => d.categoria === 'cartao').reduce((sum, d) => sum + d.valor, 0),
@@ -70,7 +90,8 @@ export const useFinanceData = () => {
       mes,
       totalRenda,
       totalDivida,
-      saldo,
+      saldoMes,
+      saldoAcumulado,
       porcentagemComprometida: totalRenda > 0 ? (totalDivida / totalRenda) * 100 : 0,
       gastosPorCategoria,
     };
@@ -82,7 +103,7 @@ export const useFinanceData = () => {
 
     const diferencaRenda = balancoAtual.totalRenda - balancoAnterior.totalRenda;
     const diferencaGastos = balancoAtual.totalDivida - balancoAnterior.totalDivida;
-    const diferencaSaldo = balancoAtual.saldo - balancoAnterior.saldo;
+    const diferencaSaldo = balancoAtual.saldoMes - balancoAnterior.saldoMes;
     const diferencaCartao = balancoAtual.gastosPorCategoria.cartao - balancoAnterior.gastosPorCategoria.cartao;
 
     let situacao: 'melhorando' | 'estavel' | 'piorando' = 'estavel';
@@ -127,17 +148,31 @@ export const useFinanceData = () => {
       });
     }
 
-    if (balanco.saldo > balanco.totalRenda * 0.2) {
+    if (balanco.saldoMes > balanco.totalRenda * 0.2) {
       insights.push({
         tipo: 'parabens',
-        mensagem: `Parabéns! Você economizou R$ ${balanco.saldo.toFixed(2)} este mês. Continue assim!`,
+        mensagem: `Parabéns! Você economizou R$ ${balanco.saldoMes.toFixed(2)} este mês. Continue assim!`,
       });
     }
 
-    if (balanco.saldo > 0 && balanco.saldo < balanco.totalRenda * 0.1) {
+    if (balanco.saldoMes > 0 && balanco.saldoMes < balanco.totalRenda * 0.1) {
       insights.push({
         tipo: 'dica',
         mensagem: 'Tente aumentar sua reserva mensal para pelo menos 20% da renda.',
+      });
+    }
+
+    if (balanco.saldoAcumulado < 0) {
+      insights.push({
+        tipo: 'alerta',
+        mensagem: `Atenção! Seu saldo acumulado está negativo em R$ ${Math.abs(balanco.saldoAcumulado).toFixed(2)}. Revise seus gastos urgentemente.`,
+      });
+    }
+
+    if (balanco.saldoAcumulado > balanco.totalRenda * 3) {
+      insights.push({
+        tipo: 'parabens',
+        mensagem: `Excelente! Você já acumulou R$ ${balanco.saldoAcumulado.toFixed(2)}. Considere investir parte desse valor.`,
       });
     }
 
