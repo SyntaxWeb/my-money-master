@@ -20,7 +20,8 @@ export interface BalancoMensal {
   mes: string;
   totalRenda: number;
   totalDivida: number;
-  saldo: number;
+  saldoMes: number;
+  saldoAcumulado: number;
   porcentagemComprometida: number;
   gastosPorCategoria: {
     cartao: number;

@@ -44,7 +44,8 @@ export default function Dashboard() {
     const b = getBalancoMensal(mes);
     return {
       mes: new Date(mes + '-01').toLocaleDateString('pt-BR', { month: 'short' }),
-      saldo: b.saldo,
+      saldoMes: b.saldoMes,
+      saldoAcumulado: b.saldoAcumulado,
       cartao: b.gastosPorCategoria.cartao,
     };
   });
@@ -112,13 +113,16 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Final</CardTitle>
-              <Wallet className="h-4 w-4" style={{ color: balanco.saldo >= 0 ? COLORS.renda : COLORS.divida }} />
+              <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
+              <Wallet className="h-4 w-4" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" style={{ color: balanco.saldo >= 0 ? COLORS.renda : COLORS.divida }}>
-                R$ {balanco.saldo.toFixed(2)}
+              <div className="text-2xl font-bold" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }}>
+                R$ {balanco.saldoMes.toFixed(2)}
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Acumulado: R$ {balanco.saldoAcumulado.toFixed(2)}
+              </p>
             </CardContent>
           </Card>
 
@@ -266,7 +270,8 @@ export default function Dashboard() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="saldo" stroke={COLORS.renda} strokeWidth={2} />
+                  <Line type="monotone" dataKey="saldoMes" name="Saldo Mês" stroke={COLORS.renda} strokeWidth={2} />
+                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado" stroke={COLORS.cartao} strokeWidth={2} strokeDasharray="5 5" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
