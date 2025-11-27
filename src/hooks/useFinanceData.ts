@@ -71,8 +71,12 @@ export const useFinanceData = () => {
   };
 
   const getBalancoMensal = (mes: string): BalancoMensal => {
+    console.log('getBalancoMensal - mes:', mes);
     const rendasMes = rendas.filter(r => r.mes === mes);
     const dividasMes = dividas.filter(d => d.mes === mes);
+    console.log('Rendas encontradas:', rendasMes.length, 'Dividas encontradas:', dividasMes.length);
+    rendasMes.forEach(r => console.log('Renda:', r.mes, r.origem, r.valor));
+    dividasMes.forEach(d => console.log('Divida:', d.mes, d.motivo, d.valor));
 
     const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
     const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
@@ -183,7 +187,9 @@ export const useFinanceData = () => {
     const meses = new Set<string>();
     rendas.forEach(r => meses.add(r.mes));
     dividas.forEach(d => meses.add(d.mes));
-    return Array.from(meses).sort().reverse();
+    const resultado = Array.from(meses).sort().reverse();
+    console.log('Meses disponíveis:', resultado);
+    return resultado;
   };
 
   return {
