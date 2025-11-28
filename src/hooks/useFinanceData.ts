@@ -29,13 +29,46 @@ export const useFinanceData = () => {
   };
 
   const addRenda = (renda: Omit<Renda, 'id'>) => {
-    const newRenda = { ...renda, id: Date.now().toString() };
-    saveRendas([...rendas, newRenda]);
+    const newRenda = { ...renda, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
+    setRendas((prev) => {
+      const next = [...prev, newRenda];
+      localStorage.setItem(STORAGE_KEYS.RENDAS, JSON.stringify(next));
+      return next;
+    });
   };
 
   const addDivida = (divida: Omit<Divida, 'id'>) => {
-    const newDivida = { ...divida, id: Date.now().toString() };
-    saveDividas([...dividas, newDivida]);
+    const newDivida = { ...divida, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
+    setDividas((prev) => {
+      const next = [...prev, newDivida];
+      localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Bulk add methods
+  const addRendas = (rendasToAdd: Omit<Renda, 'id'>[]) => {
+    setRendas((prev) => {
+      const newItems = rendasToAdd.map((r) => ({
+        ...r,
+        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
+      }));
+      const next = [...prev, ...newItems];
+      localStorage.setItem(STORAGE_KEYS.RENDAS, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const addDividas = (dividasToAdd: Omit<Divida, 'id'>[]) => {
+    setDividas((prev) => {
+      const newItems = dividasToAdd.map((d) => ({
+        ...d,
+        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
+      }));
+      const next = [...prev, ...newItems];
+      localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(next));
+      return next;
+    });
   };
 
   const updateDivida = (id: string, updates: Partial<Divida>) => {
@@ -197,6 +230,8 @@ export const useFinanceData = () => {
     dividas,
     addRenda,
     addDivida,
+    addRendas,
+    addDividas,
     updateDivida,
     deleteDivida,
     deleteRenda,

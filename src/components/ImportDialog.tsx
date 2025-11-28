@@ -18,6 +18,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
   const [open, setOpen] = useState(false);
   const [importType, setImportType] = useState<ImportType>('rendas');
   const [previewData, setPreviewData] = useState<any[]>([]);
+  const [importData, setImportData] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
   const { toast } = useToast();
 
@@ -44,6 +45,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
 
         console.log('Dados importados:', jsonData);
 
+        setImportData(jsonData);
         setPreviewData(jsonData.slice(0, 5)); // Preview das primeiras 5 linhas
       } catch (err) {
         setError('Erro ao ler o arquivo. Verifique se é um arquivo Excel válido.');
@@ -53,14 +55,14 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
   };
 
   const validateAndImport = () => {
-    if (previewData.length === 0) {
+    if (importData.length === 0) {
       setError('Nenhum dado para importar');
       return;
     }
 
     try {
       if (importType === 'rendas') {
-        const rendas: Omit<Renda, 'id'>[] = previewData.map((row: any, index) => {
+      const rendas: Omit<Renda, 'id'>[] = importData.map((row: any, index) => {
           if (!row.mes || !row.valor || !row.origem) {
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, origem)`);
           }
@@ -79,7 +81,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
           description: `${rendas.length} rendas importadas com sucesso.`,
         });
       } else {
-        const dividas: Omit<Divida, 'id'>[] = previewData.map((row: any, index) => {
+      const dividas: Omit<Divida, 'id'>[] = importData.map((row: any, index) => {
           if (!row.mes || !row.valor || !row.motivo || !row.categoria) {
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, motivo, categoria)`);
           }
@@ -112,6 +114,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
       }
 
       setOpen(false);
+      setImportData([]);
       setPreviewData([]);
       setError('');
     } catch (err) {
@@ -235,7 +238,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
                 </table>
               </div>
               <Button onClick={validateAndImport} className="w-full">
-                Importar {previewData.length} {importType === 'rendas' ? 'Rendas' : 'Despesas'}
+                Importar {importData.length || previewData.length} {importType === 'rendas' ? 'Rendas' : 'Despesas'}
               </Button>
             </div>
           )}

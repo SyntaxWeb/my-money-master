@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ export default function Dashboard() {
   const { 
     addRenda, 
     addDivida, 
+    addRendas,
+    addDividas,
     getBalancoMensal, 
     getComparativo, 
     getInsights, 
@@ -29,17 +31,26 @@ export default function Dashboard() {
   const mesesDisponiveis = getMesesDisponiveis();
   
   const handleImportRendas = (newRendas: any[]) => {
-    newRendas.forEach(renda => addRenda(renda));
+    addRendas(newRendas);
   };
 
   const handleImportDividas = (newDividas: any[]) => {
-    newDividas.forEach(divida => addDivida(divida));
+    addDividas(newDividas);
   };
   const [mesSelecionado, setMesSelecionado] = useState(
     mesesDisponiveis[0] || new Date().toISOString().slice(0, 7)
   );
   const balanco = getBalancoMensal(mesSelecionado);
   const insights = getInsights(mesSelecionado);
+  // Responsive chart height for smaller screens
+  const [chartHeight, setChartHeight] = useState<number>(250);
+  useEffect(() => {
+    const update = () => setChartHeight(window.innerWidth < 640 ? 180 : 250);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
 
   const mesAnterior = mesesDisponiveis[mesesDisponiveis.indexOf(mesSelecionado) + 1];
   const comparativo = mesAnterior ? getComparativo(mesSelecionado, mesAnterior) : null;
@@ -74,24 +85,24 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="SyntaxWeb" className="h-12 w-12 object-contain" />
-            <h1 className="text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <img src={logo} alt="SyntaxWeb" className="h-10 w-10 sm:h-12 sm:w-12 object-contain flex-shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <ImportDialog 
               onImportRendas={handleImportRendas}
               onImportDividas={handleImportDividas}
             />
             <Link to="/rendas">
-              <Button variant="outline" size="sm">
+              <Button className="w-full sm:w-auto" variant="outline" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Renda
               </Button>
             </Link>
             <Link to="/despesas">
-              <Button variant="outline" size="sm">
+              <Button className="w-full sm:w-auto" variant="outline" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Despesa
               </Button>
@@ -99,57 +110,60 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex gap-2 items-center">
-          <label className="text-sm font-medium text-foreground">Mês:</label>
+        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+          <label htmlFor="mes-select" className="text-sm font-medium text-foreground">Mês:</label>
           <select
             value={mesSelecionado}
             onChange={(e) => setMesSelecionado(e.target.value)}
-            className="px-3 py-2 border border-border rounded-md bg-background text-foreground"
+            id="mes-select"
+            className="px-3 py-2 border border-border rounded-md bg-background text-foreground w-full sm:w-auto"
           >
             {mesesDisponiveis.map(mes => (
               <option key={mes} value={mes}>
                 {(() => {
                   const [ano, mesNum] = mes.split('-').map(Number);
                   const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
-                  return data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+                  const label = data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+                  // Capitalize the first letter for pt-BR months which are lowercase by default
+                  return label.charAt(0).toUpperCase() + label.slice(1);
                 })()}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="min-w-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Rendas</CardTitle>
               <ArrowUpCircle className="h-4 w-4" style={{ color: COLORS.renda }} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" style={{ color: COLORS.renda }}>
+            <CardContent className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold" style={{ color: COLORS.renda }}>
                 R$ {balanco.totalRenda.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
               <ArrowDownCircle className="h-4 w-4" style={{ color: COLORS.divida }} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" style={{ color: COLORS.divida }}>
+            <CardContent className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold" style={{ color: COLORS.divida }}>
                 R$ {balanco.totalDivida.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
               <Wallet className="h-4 w-4" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }}>
+            <CardContent className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }}>
                 R$ {balanco.saldoMes.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -158,13 +172,13 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">% Comprometida</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
+            <CardContent className="min-w-0">
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
                 {balanco.porcentagemComprometida.toFixed(1)}%
               </div>
             </CardContent>
@@ -172,7 +186,7 @@ export default function Dashboard() {
         </div>
 
         {comparativo && (
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Comparativo com Mês Anterior</CardTitle>
             </CardHeader>
@@ -182,7 +196,7 @@ export default function Dashboard() {
                 }`}>
                 Situação: {comparativo.situacao.toUpperCase()}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Diferença Renda</p>
                   <p className={comparativo.diferencaRenda >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -223,7 +237,7 @@ export default function Dashboard() {
         )}
 
         {insights.length > 0 && (
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Insights e Recomendações</CardTitle>
             </CardHeader>
@@ -234,8 +248,7 @@ export default function Dashboard() {
                   className={`p-3 rounded-md ${insight.tipo === 'alerta' ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100' :
                     insight.tipo === 'dica' ? 'bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-100' :
                       'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100'
-                    }`}
-                >
+                    } whitespace-normal break-words`}>
                   {insight.mensagem}
                 </div>
               ))}
@@ -243,13 +256,13 @@ export default function Dashboard() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Renda x Despesas</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={chartDataMensal}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
@@ -261,12 +274,12 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Distribuição por Categoria</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={chartHeight}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -288,12 +301,12 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Evolução do Saldo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={lineDataMeses}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
@@ -307,12 +320,12 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Evolução Gastos Cartão</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={lineDataMeses}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
