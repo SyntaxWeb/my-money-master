@@ -42,6 +42,8 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
           return;
         }
 
+        console.log('Dados importados:', jsonData);
+
         setPreviewData(jsonData.slice(0, 5)); // Preview das primeiras 5 linhas
       } catch (err) {
         setError('Erro ao ler o arquivo. Verifique se é um arquivo Excel válido.');
