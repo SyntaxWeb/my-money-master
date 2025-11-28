@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import logo from '@/assets/syntaxweb-logo.jpg';
 
 const COLORS = {
   renda: 'hsl(142, 76%, 36%)',
@@ -58,7 +59,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="SyntaxWeb" className="h-12 w-12 object-contain" />
+            <h1 className="text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
+          </div>
           <div className="flex gap-2">
             <Link to="/rendas">
               <Button variant="outline" size="sm">
