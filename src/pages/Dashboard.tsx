@@ -6,6 +6,7 @@ import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus } from 'lucide
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import logo from '@/assets/syntaxweb-logo.jpg';
+import { ImportDialog } from '@/components/ImportDialog';
 
 const COLORS = {
   renda: 'hsl(142, 76%, 36%)',
@@ -17,8 +18,23 @@ const COLORS = {
 };
 
 export default function Dashboard() {
-  const { getBalancoMensal, getComparativo, getInsights, getMesesDisponiveis } = useFinanceData();
+  const { 
+    addRenda, 
+    addDivida, 
+    getBalancoMensal, 
+    getComparativo, 
+    getInsights, 
+    getMesesDisponiveis 
+  } = useFinanceData();
   const mesesDisponiveis = getMesesDisponiveis();
+  
+  const handleImportRendas = (newRendas: any[]) => {
+    newRendas.forEach(renda => addRenda(renda));
+  };
+
+  const handleImportDividas = (newDividas: any[]) => {
+    newDividas.forEach(divida => addDivida(divida));
+  };
   const [mesSelecionado, setMesSelecionado] = useState(
     mesesDisponiveis[0] || new Date().toISOString().slice(0, 7)
   );
@@ -64,6 +80,10 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
           </div>
           <div className="flex gap-2">
+            <ImportDialog 
+              onImportRendas={handleImportRendas}
+              onImportDividas={handleImportDividas}
+            />
             <Link to="/rendas">
               <Button variant="outline" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
