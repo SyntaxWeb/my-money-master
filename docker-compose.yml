@@ -1,0 +1,12 @@
+services:
+  dev:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 4000"
