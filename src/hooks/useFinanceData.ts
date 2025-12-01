@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Renda, Divida, BalancoMensal, ComparativoMensal, Insight } from '@/types/finance';
+import { Renda, Divida, BalancoMensal, ComparativoMensal, Insight, Cartao, Parcelamento } from '@/types/finance';
 
 const STORAGE_KEYS = {
   RENDAS: 'finance_rendas',
   DIVIDAS: 'finance_dividas',
+  CARTOES: 'finance_cartoes',
+  PARCELAMENTOS: 'finance_parcelamentos',
 };
 
 export const useFinanceData = () => {
   const [rendas, setRendas] = useState<Renda[]>([]);
   const [dividas, setDividas] = useState<Divida[]>([]);
+  const [cartoes, setCartoes] = useState<Cartao[]>([]);
+  const [parcelamentos, setParcelamentos] = useState<Parcelamento[]>([]);
 
   useEffect(() => {
     const storedRendas = localStorage.getItem(STORAGE_KEYS.RENDAS);
     const storedDividas = localStorage.getItem(STORAGE_KEYS.DIVIDAS);
+    const storedCartoes = localStorage.getItem(STORAGE_KEYS.CARTOES);
+    const storedParcelamentos = localStorage.getItem(STORAGE_KEYS.PARCELAMENTOS);
 
     if (storedRendas) setRendas(JSON.parse(storedRendas));
     if (storedDividas) setDividas(JSON.parse(storedDividas));
+    if (storedCartoes) setCartoes(JSON.parse(storedCartoes));
+    if (storedParcelamentos) setParcelamentos(JSON.parse(storedParcelamentos));
   }, []);
 
   const saveRendas = (newRendas: Renda[]) => {
@@ -82,6 +90,65 @@ export const useFinanceData = () => {
 
   const deleteRenda = (id: string) => {
     saveRendas(rendas.filter(r => r.id !== id));
+  };
+
+  // Cartões
+  const addCartao = (cartao: Omit<Cartao, 'id'>) => {
+    const newCartao = { ...cartao, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
+    const updated = [...cartoes, newCartao];
+    setCartoes(updated);
+    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(updated));
+  };
+
+  const updateCartao = (id: string, updates: Partial<Cartao>) => {
+    const updated = cartoes.map(c => c.id === id ? { ...c, ...updates } : c);
+    setCartoes(updated);
+    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(updated));
+  };
+
+  const deleteCartao = (id: string) => {
+    setCartoes(cartoes.filter(c => c.id !== id));
+    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(cartoes.filter(c => c.id !== id)));
+  };
+
+  // Parcelamentos
+  const addParcelamento = (parcelamento: Omit<Parcelamento, 'id'>) => {
+    const newParcelamento = { ...parcelamento, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
+    const updated = [...parcelamentos, newParcelamento];
+    setParcelamentos(updated);
+    localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(updated));
+
+    // Criar dividas para cada parcela
+    const valorParcela = parcelamento.valorTotal / parcelamento.numeroParcelas;
+    const novasDividas: Omit<Divida, 'id'>[] = [];
+    
+    for (let i = 0; i < parcelamento.numeroParcelas; i++) {
+      const [ano, mes] = parcelamento.mesInicio.split('-').map(Number);
+      const dataObj = new Date(ano, mes - 1 + i, 1);
+      const mesParcela = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
+      
+      const novaDivida: Omit<Divida, 'id'> = {
+        mes: mesParcela,
+        valor: valorParcela,
+        motivo: `${parcelamento.descricao} (${i + 1}/${parcelamento.numeroParcelas})`,
+        categoria: 'cartao',
+        data: new Date(dataObj.getFullYear(), dataObj.getMonth(), 1).toISOString().split('T')[0],
+        status: 'aberta',
+      };
+      
+      novasDividas.push(novaDivida);
+    }
+
+    addDividas(novasDividas);
+  };
+
+  const deleteParcelamento = (id: string) => {
+    setParcelamentos(parcelamentos.filter(p => p.id !== id));
+    localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(parcelamentos.filter(p => p.id !== id)));
+  };
+
+  const getParcelamentosByCartao = (cartaoId: string) => {
+    return parcelamentos.filter(p => p.cartaoId === cartaoId);
   };
 
   const getSaldoAcumuladoAteOMes = (mesAlvo: string): number => {
@@ -228,6 +295,8 @@ export const useFinanceData = () => {
   return {
     rendas,
     dividas,
+    cartoes,
+    parcelamentos,
     addRenda,
     addDivida,
     addRendas,
@@ -235,6 +304,12 @@ export const useFinanceData = () => {
     updateDivida,
     deleteDivida,
     deleteRenda,
+    addCartao,
+    updateCartao,
+    deleteCartao,
+    addParcelamento,
+    deleteParcelamento,
+    getParcelamentosByCartao,
     getBalancoMensal,
     getComparativo,
     getInsights,
