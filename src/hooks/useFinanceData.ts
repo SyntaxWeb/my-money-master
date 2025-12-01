@@ -134,6 +134,8 @@ export const useFinanceData = () => {
         categoria: 'cartao',
         data: new Date(dataObj.getFullYear(), dataObj.getMonth(), 1).toISOString().split('T')[0],
         status: 'aberta',
+        cartaoId: parcelamento.cartaoId,
+        parcelamentoId: newParcelamento.id,
       };
       
       novasDividas.push(novaDivida);

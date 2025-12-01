@@ -1,22 +1,27 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
-import type { Renda, Divida } from '@/types/finance';
+import type { Renda, Divida, Cartao, Parcelamento } from '@/types/finance';
 
 interface ImportDialogProps {
   onImportRendas: (rendas: Omit<Renda, 'id'>[]) => void;
   onImportDividas: (dividas: Omit<Divida, 'id'>[]) => void;
+  onImportFaturaCartao?: (cartaoId: string, dividas: Omit<Divida, 'id'>[], parcelamentos: Omit<Parcelamento, 'id'>[]) => void;
+  cartoes?: Cartao[];
 }
 
-type ImportType = 'rendas' | 'dividas';
+type ImportType = 'rendas' | 'dividas' | 'fatura';
 
-export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogProps) {
+export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCartao, cartoes = [] }: ImportDialogProps) {
   const [open, setOpen] = useState(false);
   const [importType, setImportType] = useState<ImportType>('rendas');
+  const [cartaoSelecionado, setCartaoSelecionado] = useState<string>('');
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [importData, setImportData] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
@@ -54,9 +59,29 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
     reader.readAsBinaryString(file);
   };
 
+  // Detectar parcelas no formato "1/12", "2/12" etc
+  const detectarParcela = (descricao: string): { isParcela: boolean; parcelaAtual?: number; totalParcelas?: number } => {
+    const regex = /(\d+)\/(\d+)/;
+    const match = descricao.match(regex);
+    if (match) {
+      return {
+        isParcela: true,
+        parcelaAtual: parseInt(match[1]),
+        totalParcelas: parseInt(match[2])
+      };
+    }
+    return { isParcela: false };
+  };
+
   const validateAndImport = () => {
     if (importData.length === 0) {
       setError('Nenhum dado para importar');
+      return;
+    }
+
+    // Fatura de cartão precisa de cartão selecionado
+    if (importType === 'fatura' && !cartaoSelecionado) {
+      setError('Selecione um cartão para importar a fatura');
       return;
     }
 
@@ -80,7 +105,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
           title: 'Sucesso!',
           description: `${rendas.length} rendas importadas com sucesso.`,
         });
-      } else {
+      } else if (importType === 'dividas') {
       const dividas: Omit<Divida, 'id'>[] = importData.map((row: any, index) => {
           if (!row.mes || !row.valor || !row.motivo || !row.categoria) {
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, motivo, categoria)`);
@@ -110,6 +135,80 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
         toast({
           title: 'Sucesso!',
           description: `${dividas.length} despesas importadas com sucesso.`,
+        });
+      } else if (importType === 'fatura' && onImportFaturaCartao) {
+        // Processar fatura do cartão
+        const dividasMap = new Map<string, any[]>();
+        
+        // Agrupar por descrição base (sem parcela)
+        importData.forEach((row: any) => {
+          if (!row.descricao || !row.valor || !row.data) {
+            throw new Error('Campos obrigatórios da fatura: descricao, valor, data');
+          }
+
+          const deteccao = detectarParcela(row.descricao);
+          const descricaoBase = deteccao.isParcela 
+            ? row.descricao.replace(/\s*\d+\/\d+\s*/, '').trim()
+            : row.descricao.trim();
+
+          if (!dividasMap.has(descricaoBase)) {
+            dividasMap.set(descricaoBase, []);
+          }
+
+          dividasMap.get(descricaoBase)!.push({
+            ...row,
+            deteccao,
+            descricaoBase
+          });
+        });
+
+        const dividas: Omit<Divida, 'id'>[] = [];
+        const parcelamentos: Omit<Parcelamento, 'id'>[] = [];
+
+        // Processar cada grupo
+        dividasMap.forEach((items, descricaoBase) => {
+          if (items.length > 1 && items[0].deteccao.isParcela) {
+            // É um parcelamento
+            const primeiraTransacao = items[0];
+            const valorTotal = items.reduce((sum, item) => sum + Number(item.valor), 0);
+            const totalParcelas = items[0].deteccao.totalParcelas || items.length;
+            
+            // Criar parcelamento
+            parcelamentos.push({
+              cartaoId: cartaoSelecionado,
+              descricao: descricaoBase,
+              valorTotal,
+              numeroParcelas: totalParcelas,
+              parcelaAtual: 1,
+              mesInicio: String(primeiraTransacao.data).substring(0, 7),
+              categoria: 'cartao'
+            });
+
+            // Não criar dívidas aqui - o parcelamento vai criar automaticamente
+          } else {
+            // Compra única
+            items.forEach(item => {
+              const dataStr = String(item.data);
+              const mes = dataStr.length >= 7 ? dataStr.substring(0, 7) : new Date().toISOString().substring(0, 7);
+              
+              dividas.push({
+                mes,
+                valor: Number(item.valor),
+                motivo: item.descricao,
+                categoria: 'cartao',
+                data: dataStr.length >= 10 ? dataStr.substring(0, 10) : new Date().toISOString().split('T')[0],
+                status: 'aberta',
+                cartaoId: cartaoSelecionado
+              });
+            });
+          }
+        });
+
+        onImportFaturaCartao(cartaoSelecionado, dividas, parcelamentos);
+        
+        toast({
+          title: 'Sucesso!',
+          description: `Fatura importada: ${dividas.length} compras únicas e ${parcelamentos.length} parcelamentos detectados.`,
         });
       }
 
@@ -154,7 +253,35 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
             >
               Despesas
             </Button>
+            {cartoes.length > 0 && onImportFaturaCartao && (
+              <Button
+                variant={importType === 'fatura' ? 'default' : 'outline'}
+                onClick={() => setImportType('fatura')}
+                className="flex-1"
+              >
+                <CreditCard className="h-4 w-4 mr-1" />
+                Fatura
+              </Button>
+            )}
           </div>
+
+          {importType === 'fatura' && (
+            <div className="space-y-2">
+              <Label htmlFor="cartao-select">Selecione o Cartão</Label>
+              <Select value={cartaoSelecionado} onValueChange={setCartaoSelecionado}>
+                <SelectTrigger id="cartao-select">
+                  <SelectValue placeholder="Escolha o cartão da fatura" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cartoes.map((cartao) => (
+                    <SelectItem key={cartao.id} value={cartao.id}>
+                      {cartao.nome} - {cartao.bandeira}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -169,7 +296,7 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
                     <li><strong>data</strong>: formato YYYY-MM-DD (opcional)</li>
                   </ul>
                 </div>
-              ) : (
+              ) : importType === 'dividas' ? (
                 <div className="space-y-1">
                   <p className="font-semibold">Colunas obrigatórias para Despesas:</p>
                   <ul className="list-disc list-inside text-sm">
@@ -180,6 +307,18 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
                     <li><strong>status</strong>: paga ou aberta (opcional, padrão: aberta)</li>
                     <li><strong>data</strong>: formato YYYY-MM-DD (opcional)</li>
                   </ul>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-semibold">Colunas obrigatórias para Fatura:</p>
+                  <ul className="list-disc list-inside text-sm">
+                    <li><strong>descricao</strong>: descrição da compra</li>
+                    <li><strong>valor</strong>: valor da transação</li>
+                    <li><strong>data</strong>: formato YYYY-MM-DD</li>
+                  </ul>
+                  <p className="text-xs mt-2 text-muted-foreground">
+                    💡 Parcelamentos são detectados automaticamente se a descrição contiver "1/12", "2/12", etc.
+                  </p>
                 </div>
               )}
             </AlertDescription>
@@ -238,7 +377,8 @@ export function ImportDialog({ onImportRendas, onImportDividas }: ImportDialogPr
                 </table>
               </div>
               <Button onClick={validateAndImport} className="w-full">
-                Importar {importData.length || previewData.length} {importType === 'rendas' ? 'Rendas' : 'Despesas'}
+                Importar {importData.length || previewData.length}{' '}
+                {importType === 'rendas' ? 'Rendas' : importType === 'dividas' ? 'Despesas' : 'Transações da Fatura'}
               </Button>
             </div>
           )}

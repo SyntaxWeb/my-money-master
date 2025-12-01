@@ -101,17 +101,16 @@ const Cartoes = () => {
   // Função para calcular gastos do cartão no mês
   const getGastosCartaoNoMes = (cartaoId: string, mes: string) => {
     return dividas
-      .filter(d => d.mes === mes && d.categoria === 'cartao' && d.motivo.toLowerCase().includes(cartoes.find(c => c.id === cartaoId)?.nome.toLowerCase() || ''))
+      .filter(d => d.mes === mes && d.categoria === 'cartao' && d.cartaoId === cartaoId)
       .reduce((sum, d) => sum + d.valor, 0);
   };
 
   // Função para pegar parcelas do cartão no mês
   const getParcelasDoMes = (cartaoId: string, mes: string) => {
-    const nomeCartao = cartoes.find(c => c.id === cartaoId)?.nome.toLowerCase() || '';
     return dividas.filter(
       d => d.mes === mes && 
       d.categoria === 'cartao' && 
-      d.motivo.toLowerCase().includes(nomeCartao)
+      d.cartaoId === cartaoId
     );
   };
 

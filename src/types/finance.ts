@@ -14,6 +14,8 @@ export interface Divida {
   categoria: 'cartao' | 'fixa' | 'variavel' | 'outro';
   data: string;
   status: 'paga' | 'aberta';
+  cartaoId?: string; // Opcional: ID do cartão quando for despesa de cartão
+  parcelamentoId?: string; // Opcional: ID do parcelamento original
 }
 
 export interface BalancoMensal {

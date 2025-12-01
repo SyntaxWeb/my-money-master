@@ -23,6 +23,8 @@ export default function Dashboard() {
     addDivida, 
     addRendas,
     addDividas,
+    addParcelamento,
+    cartoes,
     getBalancoMensal, 
     getComparativo, 
     getInsights, 
@@ -37,6 +39,17 @@ export default function Dashboard() {
   const handleImportDividas = (newDividas: any[]) => {
     addDividas(newDividas);
   };
+
+  const handleImportFaturaCartao = (cartaoId: string, dividas: any[], parcelamentos: any[]) => {
+    // Adicionar as dívidas
+    addDividas(dividas);
+    
+    // Adicionar os parcelamentos (que vão criar as parcelas automaticamente)
+    parcelamentos.forEach(parc => {
+      addParcelamento(parc);
+    });
+  };
+
   const [mesSelecionado, setMesSelecionado] = useState(
     mesesDisponiveis[0] || new Date().toISOString().slice(0, 7)
   );
@@ -94,6 +107,8 @@ export default function Dashboard() {
             <ImportDialog 
               onImportRendas={handleImportRendas}
               onImportDividas={handleImportDividas}
+              onImportFaturaCartao={handleImportFaturaCartao}
+              cartoes={cartoes}
             />
             <Link to="/rendas">
               <Button className="w-full sm:w-auto" variant="outline" size="sm">
