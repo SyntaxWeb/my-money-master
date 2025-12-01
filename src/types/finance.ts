@@ -46,3 +46,23 @@ export interface Insight {
   tipo: 'alerta' | 'dica' | 'parabens';
   mensagem: string;
 }
+
+export interface Cartao {
+  id: string;
+  nome: string;
+  bandeira: string;
+  limite: number;
+  diaFechamento: number;
+  diaVencimento: number;
+}
+
+export interface Parcelamento {
+  id: string;
+  cartaoId: string;
+  descricao: string;
+  valorTotal: number;
+  numeroParcelas: number;
+  parcelaAtual: number;
+  mesInicio: string; // formato: YYYY-MM
+  categoria: 'cartao';
+}

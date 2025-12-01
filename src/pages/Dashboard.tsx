@@ -107,6 +107,12 @@ export default function Dashboard() {
                 Despesa
               </Button>
             </Link>
+            <Link to="/cartoes">
+              <Button className="w-full sm:w-auto" variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Cartões
+              </Button>
+            </Link>
           </div>
         </div>
 
