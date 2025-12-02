@@ -24,9 +24,9 @@ const AdSlot = ({ id, size = "banner", className = "", children }: AdSlotProps) 
         className="w-full h-full flex items-center justify-center text-muted-foreground"
       >
         {children ?? (
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-sm font-semibold">Espaço para Anúncio</span>
-            <span className="text-xs text-muted-foreground">Anúncios ajudam a manter o serviço gratuito</span>
+          <div className="flex flex-col items-center gap-1 px-2">
+            <span className="text-xs md:text-sm font-semibold">Espaço para Anúncio</span>
+            <span className="text-[11px] md:text-xs text-muted-foreground">Anúncios ajudam a manter o serviço gratuito</span>
           </div>
         )}
       </div>

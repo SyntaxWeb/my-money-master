@@ -95,7 +95,7 @@ const Landing = () => {
 
       {/* Top Banner Ad */}
       <section className="container mx-auto px-4 py-4">
-        <AdSlot id="top-banner" size="banner" />
+        <AdSlot id="top-banner" size="banner" className="h-12 md:h-20 lg:h-32" />
       </section>
 
       {/* Features Grid */}
@@ -117,7 +117,7 @@ const Landing = () => {
       {/* Middle Rectangle Ad */}
       <section className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <AdSlot id="mid-rectangle" size="rectangle" />
+          <AdSlot id="mid-rectangle" size="rectangle" className="h-20 md:h-36" />
         </div>
       </section>
 
@@ -201,7 +201,7 @@ const Landing = () => {
           <p>© 2024 SyntaxFinance. Gerencie suas finanças com inteligência.</p>
           <p className="mt-2">Desenvolvido por <strong>SyntaxWeb</strong> — soluções em desenvolvimento web e design.</p>
           <div className="mt-4">
-            <AdSlot id="footer-small" size="small" />
+            <AdSlot id="footer-small" size="small" className="h-8 md:h-12" />
           </div>
         </div>
       </footer>
