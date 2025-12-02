@@ -1,6 +1,6 @@
 {
-  "name": "SyntaxWeb Finance",
-  "short_name": "Finance",
+  "name": "SyntaxWeb SyntaxFinance",
+  "short_name": "SyntaxFinance",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
