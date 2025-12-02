@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus, PiggyBank } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import logo from '@/assets/syntaxweb-logo.jpg';
 import { ImportDialog } from '@/components/ImportDialog';
+import CofrinhoPanel from '@/components/CofrinhoPanel';
 
 const COLORS = {
   renda: 'hsl(142, 76%, 36%)',
@@ -25,6 +26,7 @@ export default function Dashboard() {
     addDividas,
     addParcelamento,
     cartoes,
+    cofrinhos,
     getBalancoMensal,
     getComparativo,
     getInsights,
@@ -124,8 +126,9 @@ export default function Dashboard() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="min-w-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+
+          <Card className="min-w-0 ">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Rendas</CardTitle>
               <ArrowUpCircle className="h-4 w-4" style={{ color: COLORS.renda }} />
@@ -137,200 +140,216 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="min-w-0">
+        <Link to="/cofrinhos" className="w-full">
+          <Card className="min-w-0 hover:shadow cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
-              <ArrowDownCircle className="h-4 w-4" style={{ color: COLORS.divida }} />
+              <CardTitle className="text-sm font-medium">Total em Cofrinhos</CardTitle>
+              <PiggyBank className="h-4 w-4" />
             </CardHeader>
             <CardContent className="min-w-0">
-              <div className="text-xl sm:text-2xl font-bold" style={{ color: COLORS.divida }}>
-                R$ {balanco.totalDivida.toFixed(2)}
+              <div className="text-xl sm:text-2xl font-bold">
+                R$ {cofrinhos.reduce((sum, c) => sum + (c.saldo || 0), 0).toFixed(2)}
               </div>
             </CardContent>
           </Card>
+        </Link>
+        <Card className="min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
+            <ArrowDownCircle className="h-4 w-4" style={{ color: COLORS.divida }} />
+          </CardHeader>
+          <CardContent className="min-w-0">
+            <div className="text-xl sm:text-2xl font-bold" style={{ color: COLORS.divida }}>
+              R$ {balanco.totalDivida.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
-              <Wallet className="h-4 w-4" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }} />
-            </CardHeader>
-            <CardContent className="min-w-0">
-              <div className="text-xl sm:text-2xl font-bold" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }}>
-                R$ {balanco.saldoMes.toFixed(2)}
+        <Card className="min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
+            <Wallet className="h-4 w-4" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }} />
+          </CardHeader>
+          <CardContent className="min-w-0">
+            <div className="text-xl sm:text-2xl font-bold" style={{ color: balanco.saldoMes >= 0 ? COLORS.renda : COLORS.divida }}>
+              R$ {balanco.saldoMes.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Acumulado: R$ {balanco.saldoAcumulado.toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">% Comprometida</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="min-w-0">
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
+              {balanco.porcentagemComprometida.toFixed(1)}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {comparativo && (
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Comparativo com Mês Anterior</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className={`text-lg font-semibold ${comparativo.situacao === 'melhorando' ? 'text-green-600' :
+              comparativo.situacao === 'piorando' ? 'text-red-600' : 'text-yellow-600'
+              }`}>
+              Situação: {comparativo.situacao.toUpperCase()}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Diferença Renda</p>
+                <p className={comparativo.diferencaRenda >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {comparativo.diferencaRenda >= 0 ? '+' : ''}R$ {comparativo.diferencaRenda.toFixed(2)}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Acumulado: R$ {balanco.saldoAcumulado.toFixed(2)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">% Comprometida</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="min-w-0">
-              <div className="text-xl sm:text-2xl font-bold text-foreground">
-                {balanco.porcentagemComprometida.toFixed(1)}%
+              <div>
+                <p className="text-muted-foreground">Diferença Gastos</p>
+                <p className={comparativo.diferencaGastos <= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {comparativo.diferencaGastos >= 0 ? '+' : ''}R$ {comparativo.diferencaGastos.toFixed(2)}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {comparativo && (
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Comparativo com Mês Anterior</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className={`text-lg font-semibold ${comparativo.situacao === 'melhorando' ? 'text-green-600' :
-                comparativo.situacao === 'piorando' ? 'text-red-600' : 'text-yellow-600'
-                }`}>
-                Situação: {comparativo.situacao.toUpperCase()}
+              <div>
+                <p className="text-muted-foreground">Diferença Saldo</p>
+                <p className={comparativo.diferencaSaldo >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {comparativo.diferencaSaldo >= 0 ? '+' : ''}R$ {comparativo.diferencaSaldo.toFixed(2)}
+                </p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Diferença Renda</p>
-                  <p className={comparativo.diferencaRenda >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {comparativo.diferencaRenda >= 0 ? '+' : ''}R$ {comparativo.diferencaRenda.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Diferença Gastos</p>
-                  <p className={comparativo.diferencaGastos <= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {comparativo.diferencaGastos >= 0 ? '+' : ''}R$ {comparativo.diferencaGastos.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Diferença Saldo</p>
-                  <p className={comparativo.diferencaSaldo >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {comparativo.diferencaSaldo >= 0 ? '+' : ''}R$ {comparativo.diferencaSaldo.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Diferença Cartão</p>
-                  <p className={comparativo.diferencaCartao <= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {comparativo.diferencaCartao >= 0 ? '+' : ''}R$ {comparativo.diferencaCartao.toFixed(2)}
-                  </p>
-                </div>
+              <div>
+                <p className="text-muted-foreground">Diferença Cartão</p>
+                <p className={comparativo.diferencaCartao <= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {comparativo.diferencaCartao >= 0 ? '+' : ''}R$ {comparativo.diferencaCartao.toFixed(2)}
+                </p>
               </div>
-              {comparativo.padroes.length > 0 && (
-                <div>
-                  <p className="font-medium text-foreground mb-1">Padrões Identificados:</p>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground">
-                    {comparativo.padroes.map((padrao, idx) => (
-                      <li key={idx}>{padrao}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+            {comparativo.padroes.length > 0 && (
+              <div>
+                <p className="font-medium text-foreground mb-1">Padrões Identificados:</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {comparativo.padroes.map((padrao, idx) => (
+                    <li key={idx}>{padrao}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-        {insights.length > 0 && (
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Insights e Recomendações</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {insights.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-md ${insight.tipo === 'alerta' ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100' :
-                    insight.tipo === 'dica' ? 'bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-100' :
-                      'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100'
-                    } whitespace-normal break-words`}>
-                  {insight.mensagem}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+      {insights.length > 0 && (
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Insights e Recomendações</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {insights.map((insight, idx) => (
+              <div
+                key={idx}
+                className={`p-3 rounded-md ${insight.tipo === 'alerta' ? 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100' :
+                  insight.tipo === 'dica' ? 'bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-100' :
+                    'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100'
+                  } whitespace-normal break-words`}>
+                {insight.mensagem}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Renda x Despesas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={chartDataMensal}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="valor" fill={COLORS.cartao} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Renda x Despesas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <BarChart data={chartDataMensal}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="valor" fill={COLORS.cartao} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Distribuição por Categoria</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.name}: R$ ${entry.value.toFixed(0)}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index + 2]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Distribuição por Categoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name}: R$ ${entry.value.toFixed(0)}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index + 2]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Evolução do Saldo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <LineChart data={lineDataMeses}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="mes" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="saldoMes" name="Saldo Mês" stroke={COLORS.renda} strokeWidth={2} />
-                  <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado" stroke={COLORS.cartao} strokeWidth={2} strokeDasharray="5 5" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Evolução do Saldo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <LineChart data={lineDataMeses}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mes" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="saldoMes" name="Saldo Mês" stroke={COLORS.renda} strokeWidth={2} />
+                <Line type="monotone" dataKey="saldoAcumulado" name="Saldo Acumulado" stroke={COLORS.cartao} strokeWidth={2} strokeDasharray="5 5" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Evolução Gastos Cartão</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <LineChart data={lineDataMeses}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="mes" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="cartao" stroke={COLORS.cartao} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Evolução Gastos Cartão</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+              <LineChart data={lineDataMeses}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mes" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="cartao" stroke={COLORS.cartao} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="mt-4">
+        <CofrinhoPanel />
       </div>
     </div>
+    </div >
   );
 }

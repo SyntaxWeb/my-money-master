@@ -68,3 +68,11 @@ export interface Parcelamento {
   mesInicio: string; // formato: YYYY-MM
   categoria: 'cartao';
 }
+
+export interface Cofrinho {
+  id: string;
+  nome: string;
+  descricao?: string;
+  saldo: number;
+  criadoEm?: string; // ISO date
+}

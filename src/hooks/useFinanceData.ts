@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Renda, Divida, BalancoMensal, ComparativoMensal, Insight, Cartao, Parcelamento } from '@/types/finance';
+import { Renda, Divida, BalancoMensal, ComparativoMensal, Insight, Cartao, Parcelamento, Cofrinho } from '@/types/finance';
 
 const STORAGE_KEYS = {
   RENDAS: 'finance_rendas',
   DIVIDAS: 'finance_dividas',
   CARTOES: 'finance_cartoes',
   PARCELAMENTOS: 'finance_parcelamentos',
+  COFRINHOS: 'finance_cofrinhos',
 };
 
 export const useFinanceData = () => {
@@ -13,17 +14,20 @@ export const useFinanceData = () => {
   const [dividas, setDividas] = useState<Divida[]>([]);
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
   const [parcelamentos, setParcelamentos] = useState<Parcelamento[]>([]);
+  const [cofrinhos, setCofrinhos] = useState<Cofrinho[]>([]);
 
   useEffect(() => {
     const storedRendas = localStorage.getItem(STORAGE_KEYS.RENDAS);
     const storedDividas = localStorage.getItem(STORAGE_KEYS.DIVIDAS);
     const storedCartoes = localStorage.getItem(STORAGE_KEYS.CARTOES);
     const storedParcelamentos = localStorage.getItem(STORAGE_KEYS.PARCELAMENTOS);
+    const storedCofrinhos = localStorage.getItem(STORAGE_KEYS.COFRINHOS);
 
     if (storedRendas) setRendas(JSON.parse(storedRendas));
     if (storedDividas) setDividas(JSON.parse(storedDividas));
     if (storedCartoes) setCartoes(JSON.parse(storedCartoes));
     if (storedParcelamentos) setParcelamentos(JSON.parse(storedParcelamentos));
+    if (storedCofrinhos) setCofrinhos(JSON.parse(storedCofrinhos));
   }, []);
 
   const saveRendas = (newRendas: Renda[]) => {
@@ -34,6 +38,11 @@ export const useFinanceData = () => {
   const saveDividas = (newDividas: Divida[]) => {
     setDividas(newDividas);
     localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(newDividas));
+  };
+
+  const saveCofrinhos = (newCofrinhos: Cofrinho[]) => {
+    setCofrinhos(newCofrinhos);
+    localStorage.setItem(STORAGE_KEYS.COFRINHOS, JSON.stringify(newCofrinhos));
   };
 
   const addRenda = (renda: Omit<Renda, 'id'>) => {
@@ -241,6 +250,98 @@ export const useFinanceData = () => {
     localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(parcelamentos.filter(p => p.id !== id)));
   };
 
+  // Cofrinhos (savings jars)
+  const addCofrinho = (cofrinho: Omit<Cofrinho, 'id' | 'criadoEm'>, initialDeposit = 0, mes?: string): boolean => {
+    const newCofrinho: Cofrinho = {
+      ...cofrinho,
+      id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
+      criadoEm: new Date().toISOString(),
+      saldo: Number(((cofrinho.saldo || 0) + initialDeposit).toFixed(2)),
+    };
+
+    const targetMes = mes || new Date().toISOString().slice(0, 7);
+    const bal = getBalancoMensal(targetMes);
+    // If initial deposit is greater than current monthly balance, prevent deposit
+    if (initialDeposit && initialDeposit > 0) {
+      if (initialDeposit > bal.saldoMes) {
+        // create cofrinho, but without deposit
+        const updated = [...cofrinhos, { ...newCofrinho, saldo: 0 }];
+        saveCofrinhos(updated);
+        return false;
+      }
+    }
+
+    const updated = [...cofrinhos, newCofrinho];
+    saveCofrinhos(updated);
+
+    if (initialDeposit && initialDeposit > 0) {
+      addDivida({
+        mes: targetMes,
+        valor: Number(initialDeposit.toFixed(2)),
+        motivo: `Transfer to cofrinho: ${newCofrinho.nome}`,
+        categoria: 'outro',
+        data: new Date().toISOString().split('T')[0],
+        status: 'aberta',
+      });
+    }
+
+    return true;
+  };
+
+  const updateCofrinho = (id: string, updates: Partial<Cofrinho>) => {
+    const updated = cofrinhos.map(c => c.id === id ? { ...c, ...updates } : c);
+    saveCofrinhos(updated);
+  };
+
+  const deleteCofrinho = (id: string) => {
+    saveCofrinhos(cofrinhos.filter(c => c.id !== id));
+  };
+
+  const depositToCofrinho = (id: string, amount: number, mes?: string): boolean => {
+    if (amount <= 0) return false;
+    const targetMes = mes || new Date().toISOString().slice(0, 7);
+    const bal = getBalancoMensal(targetMes);
+    // If user tries to deposit more than the available monthly saldo, prevent the operation
+    if (amount > bal.saldoMes) {
+      return false;
+    }
+    const c = cofrinhos.find(c => c.id === id);
+    if (!c) return;
+
+    // Create expense entry to reflect money out
+    addDivida({
+      mes: targetMes,
+      valor: Number(amount.toFixed(2)),
+      motivo: `Transfer to cofrinho: ${c.nome}`,
+      categoria: 'outro',
+      data: new Date().toISOString().split('T')[0],
+      status: 'aberta',
+    });
+
+    // Update cofrinho balance
+    updateCofrinho(id, { saldo: Number((c.saldo + amount).toFixed(2)) });
+    return true;
+  };
+
+  const withdrawFromCofrinho = (id: string, amount: number, mes?: string) => {
+    if (amount <= 0) return;
+    const c = cofrinhos.find(c => c.id === id);
+    if (!c) return;
+    if (amount > c.saldo) return;
+    const targetMes = mes || new Date().toISOString().slice(0, 7);
+
+    // create renda to reflect money returned to month
+    addRenda({
+      mes: targetMes,
+      valor: Number(amount.toFixed(2)),
+      origem: `Cofrinho: ${c.nome}`,
+      data: new Date().toISOString().split('T')[0],
+    });
+
+    // update cofrinho saldo
+    updateCofrinho(id, { saldo: Number((c.saldo - amount).toFixed(2)) });
+  };
+
   const getParcelamentosByCartao = (cartaoId: string) => {
     return parcelamentos.filter(p => p.cartaoId === cartaoId);
   };
@@ -391,6 +492,7 @@ export const useFinanceData = () => {
     dividas,
     cartoes,
     parcelamentos,
+    cofrinhos,
     addRenda,
     addDivida,
     addRendas,
@@ -403,6 +505,11 @@ export const useFinanceData = () => {
     deleteCartao,
     addParcelamento,
     deleteParcelamento,
+    addCofrinho,
+    updateCofrinho,
+    deleteCofrinho,
+    depositToCofrinho,
+    withdrawFromCofrinho,
     getParcelamentosByCartao,
     getBalancoMensal,
     getComparativo,
