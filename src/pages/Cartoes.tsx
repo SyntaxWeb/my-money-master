@@ -84,7 +84,6 @@ const Cartoes = () => {
       mesInicio,
       categoria: 'cartao',
     });
-    return; // Remover após o debug
 
     addParcelamento({
       cartaoId: cartaoSelecionado,
@@ -127,7 +126,7 @@ const Cartoes = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-8">
-        <NavLink to="/">← Voltar ao Dashboard</NavLink>
+        <NavLink to="/app">← Voltar ao Dashboard</NavLink>
 
         <Tabs defaultValue="cadastro" className="w-full">
           <TabsList className="grid w-full grid-cols-2">

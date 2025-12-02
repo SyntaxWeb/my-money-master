@@ -8,7 +8,7 @@ export default function Cofrinhos() {
         <div className="min-h-screen bg-background p-4 md:p-8">
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center gap-4">
-                    <Link to="/">
+                    <Link to="/app">
                         <Button variant="ghost" size="sm">
                             <ArrowLeft className="w-4 h-4" />
                         </Button>

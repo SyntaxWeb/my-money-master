@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import AdSlot from "@/components/ui/ad-slot";
 import { Link } from "react-router-dom";
 import { 
   Wallet, 
@@ -62,7 +63,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet className="w-6 h-6 text-primary" />
-            <span className="font-bold text-xl">FinanceApp</span>
+            <span className="font-bold text-xl">SyntaxFinance</span>
           </div>
           <Button asChild>
             <Link to="/app">
@@ -92,6 +93,11 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Top Banner Ad */}
+      <section className="container mx-auto px-4 py-4">
+        <AdSlot id="top-banner" size="banner" />
+      </section>
+
       {/* Features Grid */}
       <section className="container mx-auto px-4 py-20">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
@@ -105,6 +111,13 @@ const Landing = () => {
               <p className="text-muted-foreground">{feature.description}</p>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Middle Rectangle Ad */}
+      <section className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <AdSlot id="mid-rectangle" size="rectangle" />
         </div>
       </section>
 
@@ -185,8 +198,11 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t py-8 mt-20">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>© 2024 FinanceApp. Gerencie suas finanças com inteligência.</p>
+          <p>© 2024 SyntaxFinance. Gerencie suas finanças com inteligência.</p>
           <p className="mt-2">Desenvolvido por <strong>SyntaxWeb</strong> — soluções em desenvolvimento web e design.</p>
+          <div className="mt-4">
+            <AdSlot id="footer-small" size="small" />
+          </div>
         </div>
       </footer>
     </div>
