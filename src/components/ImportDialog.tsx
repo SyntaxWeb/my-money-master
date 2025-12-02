@@ -24,6 +24,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
   const [cartaoSelecionado, setCartaoSelecionado] = useState<string>('');
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [importData, setImportData] = useState<any[]>([]);
+  const [faturaMes, setFaturaMes] = useState<string>('');
   const [error, setError] = useState<string>('');
   const { toast } = useToast();
 
@@ -52,6 +53,21 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
         setImportData(jsonData);
         setPreviewData(jsonData.slice(0, 5)); // Preview das primeiras 5 linhas
+        // Detect months in the file and default fatura month (most frequent)
+        const months: Record<string, number> = {};
+        jsonData.forEach((r: any) => {
+          if (!r.data) return;
+          const mon = String(r.data).substring(0, 7);
+          if (mon) months[mon] = (months[mon] || 0) + 1;
+        });
+        const monthsKeys = Object.keys(months);
+        if (monthsKeys.length > 0) {
+          // choose the latest month available in the file as default invoice month
+          monthsKeys.sort();
+          setFaturaMes(monthsKeys[monthsKeys.length - 1]);
+        } else {
+          setFaturaMes(new Date().toISOString().slice(0, 7));
+        }
       } catch (err) {
         setError('Erro ao ler o arquivo. Verifique se é um arquivo Excel válido.');
       }
@@ -59,19 +75,78 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
     reader.readAsBinaryString(file);
   };
 
-  // Detectar parcelas no formato "1/12", "2/12" etc
-  const detectarParcela = (descricao: string): { isParcela: boolean; parcelaAtual?: number; totalParcelas?: number } => {
-    const regex = /(\d+)\/(\d+)/;
-    const match = descricao.match(regex);
-    if (match) {
-      return {
-        isParcela: true,
-        parcelaAtual: parseInt(match[1]),
-        totalParcelas: parseInt(match[2])
-      };
+  // Detectar parcelas no formato "1/12", "2/12" etc — procurar primeiro por campos no row (parcelas/parcela)
+  const detectarParcela = (
+    rowOrDescricao: any
+  ): { isParcela: boolean; parcelaAtual?: number; totalParcelas?: number } => {
+
+    let value = '';
+    let fromFields = false;
+
+    if (typeof rowOrDescricao === 'object' && rowOrDescricao !== null) {
+
+      // 1. Se EXISTE row.parcela ou row.parcelas, ignorar regex
+      if (rowOrDescricao.parcelas || rowOrDescricao.parcela) {
+        fromFields = true;
+
+        const raw = String(rowOrDescricao.parcelas ?? rowOrDescricao.parcela).trim();
+
+        const regexField = /^(\d{1,2})[\/\-](\d{1,2})$/;
+        const matchField = raw.match(regexField);
+
+        // só aceita formatos válidos de parcela, não datas
+        if (matchField) {
+          return {
+            isParcela: true,
+            parcelaAtual: Number(matchField[1]),
+            totalParcelas: Number(matchField[2])
+          };
+        }
+
+        // Se o campo existe mas não segue formato válido → é tratado como NÃO parcela
+        return { isParcela: false };
+      }
+
+      // 2. Se não tinha parcelas/parcela: tentar outros campos
+      value = String(
+        rowOrDescricao.parcelaAtual ??
+        rowOrDescricao.parcelamento ??
+        rowOrDescricao.descricao ??
+        ''
+      ).trim();
+    } else {
+      // Descricao pura
+      value = String(rowOrDescricao ?? '').trim();
     }
+
+    // 3. Se veio de campo direto, NUNCA usar regex
+    if (fromFields) {
+      return { isParcela: false };
+    }
+
+    // 4. Regex seguro contra datas
+    // aceita 1/12, 2-10, 09/06
+    // MAS recusa anos (ex: 12/2025)
+    const regex = /^(\d{1,2})[\/\-](\d{1,2})$/;
+    const match = value.match(regex);
+
+    if (match) {
+      const parcelaAtual = Number(match[1]);
+      const totalParcelas = Number(match[2]);
+
+      // evita falsos positivos como 03/2025
+      if (totalParcelas > 1 && totalParcelas <= 60) {
+        return {
+          isParcela: true,
+          parcelaAtual,
+          totalParcelas
+        };
+      }
+    }
+
     return { isParcela: false };
   };
+
 
   const validateAndImport = () => {
     if (importData.length === 0) {
@@ -87,11 +162,11 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
     try {
       if (importType === 'rendas') {
-      const rendas: Omit<Renda, 'id'>[] = importData.map((row: any, index) => {
+        const rendas: Omit<Renda, 'id'>[] = importData.map((row: any, index) => {
           if (!row.mes || !row.valor || !row.origem) {
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, origem)`);
           }
-          
+
           return {
             mes: String(row.mes).trim(),
             valor: Number(row.valor),
@@ -106,7 +181,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
           description: `${rendas.length} rendas importadas com sucesso.`,
         });
       } else if (importType === 'dividas') {
-      const dividas: Omit<Divida, 'id'>[] = importData.map((row: any, index) => {
+        const dividas: Omit<Divida, 'id'>[] = importData.map((row: any, index) => {
           if (!row.mes || !row.valor || !row.motivo || !row.categoria) {
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, motivo, categoria)`);
           }
@@ -139,58 +214,137 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
       } else if (importType === 'fatura' && onImportFaturaCartao) {
         // Processar fatura do cartão
         const dividasMap = new Map<string, any[]>();
-        
-        // Agrupar por descrição base (sem parcela)
+
         importData.forEach((row: any) => {
           if (!row.descricao || !row.valor || !row.data) {
             throw new Error('Campos obrigatórios da fatura: descricao, valor, data');
           }
 
-          const deteccao = detectarParcela(row.descricao);
-          const descricaoBase = deteccao.isParcela 
+          const deteccao = detectarParcela(row);
+
+          const descricaoBase = deteccao.isParcela
             ? row.descricao.replace(/\s*\d+\/\d+\s*/, '').trim()
             : row.descricao.trim();
 
-          if (!dividasMap.has(descricaoBase)) {
-            dividasMap.set(descricaoBase, []);
+          // NOVO: usar totalParcelas para separar parcelamentos distintos
+          const key = deteccao.isParcela
+            ? `${descricaoBase}__${deteccao.totalParcelas}`
+            : `${descricaoBase}__single`;
+
+          if (!dividasMap.has(key)) {
+            dividasMap.set(key, []);
           }
 
-          dividasMap.get(descricaoBase)!.push({
+          dividasMap.get(key)!.push({
             ...row,
             deteccao,
-            descricaoBase
+            descricaoBase,
+            key
           });
         });
 
         const dividas: Omit<Divida, 'id'>[] = [];
         const parcelamentos: Omit<Parcelamento, 'id'>[] = [];
 
+        // Função utilitária: formatar para YYYY-MM
+        const formatYYYYMM = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          return `${y}-${m}`;
+        };
+        const addMonthsStr = (base: string, monthsToAdd: number) => {
+          const [y, m] = base.split('-').map(Number);
+          const d = new Date(y, m - 1 + monthsToAdd, 1);
+          return formatYYYYMM(d);
+        };
+        const subtractMonthsStr = (base: string, monthsToSubtract: number) => addMonthsStr(base, -monthsToSubtract);
+        const diffMonths = (start: string, end: string) => {
+          const [sy, sm] = start.split('-').map(Number);
+          const [ey, em] = end.split('-').map(Number);
+          return (ey - sy) * 12 + (em - sm);
+        };
+
+        // Detectar mês da fatura a partir das transações (mês mais frequente entre as datas)
+        const detectInvoiceMonth = (rows: any[]) => {
+          const freq: Record<string, number> = {};
+          rows.forEach(r => {
+            if (!r.data) return;
+            const mon = String(r.data).substring(0, 7);
+            if (!mon) return;
+            freq[mon] = (freq[mon] || 0) + 1;
+          });
+          const entries = Object.entries(freq);
+          if (entries.length === 0) return formatYYYYMM(new Date());
+          entries.sort((a, b) => b[1] - a[1]);
+          return entries[0][0];
+        };
+
+        const invoiceMonthStr = detectInvoiceMonth(importData);
+
         // Processar cada grupo
         dividasMap.forEach((items, descricaoBase) => {
-          if (items.length > 1 && items[0].deteccao.isParcela) {
-            // É um parcelamento
-            const primeiraTransacao = items[0];
-            const valorTotal = items.reduce((sum, item) => sum + Number(item.valor), 0);
-            const totalParcelas = items[0].deteccao.totalParcelas || items.length;
-            
-            // Criar parcelamento
+          // split items into parcel and single items (groups could contain a mix)
+          const parcelItems = items.filter(it => it.deteccao?.isParcela);
+          const singleItems = items.filter(it => !it.deteccao?.isParcela);
+          if (parcelItems.length > 0) {
+            // É um parcelamento (usando apenas os itens parcelados do grupo)
+            const primeiraTransacao = parcelItems.reduce((a, b) => (new Date(String(a.data)) <= new Date(String(b.data)) ? a : b), parcelItems[0]);
+            const currentMonthStr = faturaMes || invoiceMonthStr;
+            const itemInCurrentMonth = parcelItems.find(it => String(it.data).substring(0, 7) === currentMonthStr);
+            const parcelaAtualDetectada = Math.max(...parcelItems.map(it => it.deteccao.parcelaAtual || 0)) || 1;
+            const totalParcelasCandidates = parcelItems.map(it => it.deteccao.totalParcelas || 0).filter(Boolean);
+            const totalParcelas = totalParcelasCandidates.length > 0 ? Math.max(...totalParcelasCandidates) : parcelItems.length;
+            const somaParcelasPresentes = parcelItems.reduce((sum, item) => sum + Number(item.valor), 0);
+            let valorTotal;
+            if (parcelItems.length === totalParcelas) {
+              valorTotal = somaParcelasPresentes;
+            } else if (parcelItems.length === 1 && parcelItems[0].deteccao.isParcela && totalParcelas > 1) {
+              valorTotal = Number(parcelItems[0].valor) * totalParcelas;
+            } else if (parcelItems.length > 1 && parcelItems.length < totalParcelas) {
+              const average = somaParcelasPresentes / parcelItems.length;
+              valorTotal = Number((average * totalParcelas).toFixed(2));
+            } else {
+              valorTotal = somaParcelasPresentes;
+            }
+
+            const itemCorrespondente = parcelItems.find(it => it.deteccao.parcelaAtual === parcelaAtualDetectada) ?? parcelItems.find(it => String(it.data).substring(0, 7) === currentMonthStr) ?? (parcelItems.length === 1 ? parcelItems[0] : undefined);
+
+            if (itemCorrespondente) {
+              dividas.push({
+                mes: currentMonthStr,
+                valor: Number(itemCorrespondente.valor),
+                motivo: String(itemCorrespondente.descricao).trim(),
+                categoria: 'cartao',
+                data: String(itemCorrespondente.data).substring(0, 10),
+                status: 'aberta',
+                cartaoId: cartaoSelecionado
+              });
+            }
+
+            const mesInicioFromData = formatYYYYMM(new Date(String(primeiraTransacao.data)));
+            const mesInicioFromCurrent = subtractMonthsStr(currentMonthStr, parcelaAtualDetectada - 1);
+            const computedCurrentMonthIfData = addMonthsStr(mesInicioFromData, parcelaAtualDetectada - 1);
+            let mesInicioCalculado = computedCurrentMonthIfData === currentMonthStr ? mesInicioFromData : mesInicioFromCurrent;
+
+            const expectedParcelaFromStart = diffMonths(mesInicioCalculado, currentMonthStr) + 1; // 1-based
+            const parcelaAtualForParcelamento = Math.max(parcelaAtualDetectada, expectedParcelaFromStart);
+            const parcelaAtualFinal = Math.min(parcelaAtualForParcelamento, totalParcelas);
+
             parcelamentos.push({
               cartaoId: cartaoSelecionado,
               descricao: descricaoBase,
               valorTotal,
               numeroParcelas: totalParcelas,
-              parcelaAtual: 1,
-              mesInicio: String(primeiraTransacao.data).substring(0, 7),
+              parcelaAtual: parcelaAtualFinal,
+              mesInicio: mesInicioCalculado,
               categoria: 'cartao'
             });
+          }
 
-            // Não criar dívidas aqui - o parcelamento vai criar automaticamente
-          } else {
-            // Compra única
-            items.forEach(item => {
+          if (singleItems.length > 0) {
+            singleItems.forEach(item => {
               const dataStr = String(item.data);
               const mes = dataStr.length >= 7 ? dataStr.substring(0, 7) : new Date().toISOString().substring(0, 7);
-              
               dividas.push({
                 mes,
                 valor: Number(item.valor),
@@ -205,7 +359,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
         });
 
         onImportFaturaCartao(cartaoSelecionado, dividas, parcelamentos);
-        
+
         toast({
           title: 'Sucesso!',
           description: `Fatura importada: ${dividas.length} compras únicas e ${parcelamentos.length} parcelamentos detectados.`,
@@ -267,20 +421,54 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
           {importType === 'fatura' && (
             <div className="space-y-2">
-              <Label htmlFor="cartao-select">Selecione o Cartão</Label>
-              <Select value={cartaoSelecionado} onValueChange={setCartaoSelecionado}>
-                <SelectTrigger id="cartao-select">
-                  <SelectValue placeholder="Escolha o cartão da fatura" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cartoes.map((cartao) => (
-                    <SelectItem key={cartao.id} value={cartao.id}>
-                      {cartao.nome} - {cartao.bandeira}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="cartao-select">Selecione o Cartão</Label>
+                  <Select value={cartaoSelecionado} onValueChange={setCartaoSelecionado}>
+                    <SelectTrigger id="cartao-select">
+                      <SelectValue placeholder="Escolha o cartão da fatura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cartoes.map((cartao) => (
+                        <SelectItem key={cartao.id} value={cartao.id}>
+                          {cartao.nome} - {cartao.bandeira}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="fatura-mes">Mês da Fatura</Label>
+                  <select id="fatura-mes" value={faturaMes} onChange={(e) => setFaturaMes(e.target.value)} className="px-3 py-2 border border-border rounded-md w-full">
+                    {(() => {
+                      const uniqueMonths = Array.from(new Set(importData.map((r: any) => String(r.data).substring(0, 7)).filter(Boolean)));
+                      const months = uniqueMonths.length > 0 ? uniqueMonths : [new Date().toISOString().slice(0, 7)];
+                      return months.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              </div>
+
             </div>
+          )}
+
+          {importType === 'fatura' && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <p className="font-semibold">Formato para Fatura:</p>
+                  <ul className="list-disc list-inside text-sm">
+                    <li><strong>descricao</strong>: descrição da compra</li>
+                    <li><strong>valor</strong>: valor da transação</li>
+                    <li><strong>data</strong>: data da transação (YYYY-MM-DD)</li>
+                    <li><strong>parcelas</strong>: opcional. Ex: <em>1/12</em> ou <em>12</em>. Se presente, o import tratará como parcelamento e irá criar as parcelas futuras a partir do próximo mês da fatura (por exemplo, se a fatura atual é 12/2025, a próxima parcela ficará em 01/2026).</li>
+                  </ul>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           <Alert>

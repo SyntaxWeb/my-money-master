@@ -75,6 +75,16 @@ const Cartoes = () => {
       });
       return;
     }
+    console.log('Adicionando parcelamento:', {
+     cartaoId: cartaoSelecionado,
+      descricao,
+      valorTotal: parseFloat(valorTotal),
+      numeroParcelas: parseInt(numeroParcelas),
+      parcelaAtual: 1,
+      mesInicio,
+      categoria: 'cartao',
+    });
+    return; // Remover após o debug
 
     addParcelamento({
       cartaoId: cartaoSelecionado,

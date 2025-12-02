@@ -10,12 +10,17 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function Despesas() {
-  const { dividas, addDivida, updateDivida, deleteDivida } = useFinanceData();
+  const { dividas, addDivida, updateDivida, deleteDivida, cartoes, addParcelamento } = useFinanceData();
   const [formData, setFormData] = useState({
     mes: new Date().toISOString().slice(0, 7),
     valor: '',
     motivo: '',
     categoria: 'variavel' as 'cartao' | 'fixa' | 'variavel' | 'outro',
+    // new fields for cartão
+    cartaoId: '',
+    tipoPagamento: 'avista' as 'avista' | 'parcelado',
+    numeroParcelas: 1,
+    parcelaAtual: 1,
     data: new Date().toISOString().slice(0, 10),
   });
 
@@ -25,6 +30,68 @@ export default function Despesas() {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
+    // If category is cartao and payment is parcelado, create parcelamento and schedule installments
+    if (formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado') {
+      if (!formData.cartaoId) {
+        toast.error('Selecione um cartão para despesas parceladas');
+        return;
+      }
+      if (!formData.numeroParcelas || Number(formData.numeroParcelas) < 2) {
+        toast.error('Insira um número de parcelas válido (>= 2)');
+        return;
+      }
+
+      const parcelaAtual = Number(formData.parcelaAtual) || 1;
+      const numeroParcelas = Number(formData.numeroParcelas);
+      const valorParcela = parseFloat(formData.valor);
+      const motivoComParcela = `${formData.motivo} (${parcelaAtual}/${numeroParcelas})`;
+
+      addDivida({
+        mes: formData.mes,
+        valor: valorParcela,
+        motivo: motivoComParcela,
+        categoria: 'cartao',
+        data: formData.data,
+        status: 'aberta',
+        cartaoId: formData.cartaoId,
+      });
+
+      // compute start month for parcelamento
+      const subtractMonthsStr = (base: string, monthsToSubtract: number) => {
+        const [y, m] = base.split('-').map(Number);
+        const d = new Date(y, m - 1 - monthsToSubtract, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      };
+
+      const mesInicio = subtractMonthsStr(formData.mes, parcelaAtual - 1);
+      const valorTotal = Number((valorParcela * numeroParcelas).toFixed(2));
+
+      addParcelamento({
+        cartaoId: formData.cartaoId,
+        descricao: String(formData.motivo).trim(),
+        valorTotal,
+        numeroParcelas,
+        parcelaAtual,
+        mesInicio,
+        categoria: 'cartao',
+      });
+
+      toast.success('Despesa parcelada cadastrada e parcelas agendadas.');
+      setFormData({
+        mes: formData.mes,
+        valor: '',
+        motivo: '',
+        categoria: 'variavel',
+        cartaoId: '',
+        tipoPagamento: 'avista',
+        numeroParcelas: 1,
+        parcelaAtual: 1,
+        data: new Date().toISOString().slice(0, 10),
+      });
+      return;
+    }
+
+    // Default add single divida
     addDivida({
       mes: formData.mes,
       valor: parseFloat(formData.valor),
@@ -32,6 +99,7 @@ export default function Despesas() {
       categoria: formData.categoria,
       data: formData.data,
       status: 'aberta',
+      ...(formData.categoria === 'cartao' && formData.cartaoId ? { cartaoId: formData.cartaoId } : {}),
     });
     toast.success('Despesa cadastrada com sucesso!');
     setFormData({
@@ -39,6 +107,10 @@ export default function Despesas() {
       valor: '',
       motivo: '',
       categoria: 'variavel',
+      cartaoId: '',
+      tipoPagamento: 'avista',
+      numeroParcelas: 1,
+      parcelaAtual: 1,
       data: new Date().toISOString().slice(0, 10),
     });
   };
@@ -108,6 +180,10 @@ export default function Despesas() {
                     onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
                     required
                   />
+                  {formData.categoria === "cartao" && formData.tipoPagamento === "parcelado" && (
+                    <p className="text-xs text-muted-foreground mt-1">Atenção: o valor informado será considerado a parcela atual. Se estiver informando o valor total, divida-o pelo número de parcelas antes de cadastrar.</p>
+                  )}
+
                 </div>
                 <div>
                   <Label htmlFor="categoria">Categoria</Label>
@@ -126,6 +202,71 @@ export default function Despesas() {
                     </SelectContent>
                   </Select>
                 </div>
+                {formData.categoria === 'cartao' && (
+                  <div>
+                    <Label htmlFor="cartao">Cartão</Label>
+                    <Select
+                      value={formData.cartaoId}
+                      onValueChange={(value: any) => setFormData({ ...formData, cartaoId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o cartão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cartoes.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.nome} - {c.bandeira}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">Selecione o cartão que receberá a cobrança. Se não houver cartões cadastrados, crie um em <strong>Cartões</strong>.</p>
+                  </div>
+                )}
+                {formData.categoria === 'cartao' && (
+                  <div>
+                    <Label htmlFor="tipoPagamento">Tipo Pagamento</Label>
+                    <Select
+                      value={formData.tipoPagamento}
+                      onValueChange={(v: any) => setFormData({ ...formData, tipoPagamento: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="avista">À vista</SelectItem>
+                        <SelectItem value="parcelado">Parcelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">Escolha "Parcelado" para dividir o valor em várias parcelas. O sistema criará automaticamente as próximas parcelas na fatura do cartão.</p>
+                  </div>
+                )}
+                {formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado' && (
+                  <>
+                    <div>
+                      <Label htmlFor="numeroParcelas">Número de Parcelas</Label>
+                      <Input
+                        id="numeroParcelas"
+                        type="number"
+                        min={2}
+                        value={String(formData.numeroParcelas)}
+                        onChange={(e) => setFormData({ ...formData, numeroParcelas: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="parcelaAtual">Parcela Atual</Label>
+                      <Input
+                        id="parcelaAtual"
+                        type="number"
+                        min={1}
+                        max={Number(formData.numeroParcelas) || 1}
+                        value={String(formData.parcelaAtual)}
+                        onChange={(e) => setFormData({ ...formData, parcelaAtual: Number(e.target.value) })}
+                      />
+                    </div>
+                  </>
+                )}
+                {formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado' && (
+                  <p className="text-sm text-muted-foreground md:col-span-2">Os lançamentos das próximas parcelas serão criados automaticamente no cartão selecionado.</p>
+                )}
                 <div className="md:col-span-2">
                   <Label htmlFor="motivo">Motivo / Descrição</Label>
                   <Input
@@ -182,9 +323,14 @@ export default function Despesas() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-foreground">{divida.motivo}</p>
-                            <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                              {categoriasLabels[divida.categoria]}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
+                                {categoriasLabels[divida.categoria]}
+                              </span>
+                              {divida.parcelamentoId && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-accent text-accent-foreground">Parcelado</span>
+                              )}
+                            </div>
                           </div>
                           <p className="text-sm text-muted-foreground">
                             {new Date(divida.data).toLocaleDateString('pt-BR')}

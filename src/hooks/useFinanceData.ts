@@ -113,36 +113,128 @@ export const useFinanceData = () => {
 
   // Parcelamentos
   const addParcelamento = (parcelamento: Omit<Parcelamento, 'id'>) => {
-    const newParcelamento = { ...parcelamento, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
+    // Verifica se já existe parcelamento igual
+    const exists = parcelamentos.some(
+      p =>
+        p.cartaoId === parcelamento.cartaoId &&
+        p.descricao === parcelamento.descricao &&
+        p.mesInicio === parcelamento.mesInicio &&
+        p.valorTotal === parcelamento.valorTotal &&
+        p.numeroParcelas === parcelamento.numeroParcelas
+    );
+
+    if (exists) return;
+
+    // Cria ID único
+    const newParcelamento = {
+      ...parcelamento,
+      id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
+    };
+
     const updated = [...parcelamentos, newParcelamento];
     setParcelamentos(updated);
     localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(updated));
 
-    // Criar dividas para cada parcela
-    const valorParcela = parcelamento.valorTotal / parcelamento.numeroParcelas;
+    // VINCULAR parcela atual à dívida do mês atual
+    try {
+      const currentIndex = (parcelamento.parcelaAtual - 1); // 0-based
+      const [startAno, startMes] = parcelamento.mesInicio.split('-').map(Number);
+
+      const currDateObj = new Date(startAno, (startMes - 1) + currentIndex, 1);
+      const currMesStr = `${currDateObj.getFullYear()}-${String(currDateObj.getMonth() + 1).padStart(2, '0')}`;
+
+      setDividas(prev => {
+        const mutated = prev.map(d => {
+          if (
+            d.cartaoId === parcelamento.cartaoId &&
+            d.mes === currMesStr &&
+            d.motivo?.includes(parcelamento.descricao)
+          ) {
+            return { ...d, parcelamentoId: newParcelamento.id };
+          }
+          return d;
+        });
+        localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(mutated));
+        return mutated;
+      });
+    } catch { }
+
+    // Criar dívidas FUTURAS
+    const valorParcelaBase = parcelamento.valorTotal / parcelamento.numeroParcelas;
     const novasDividas: Omit<Divida, 'id'>[] = [];
-    
-    for (let i = 0; i < parcelamento.numeroParcelas; i++) {
-      const [ano, mes] = parcelamento.mesInicio.split('-').map(Number);
-      const dataObj = new Date(ano, mes - 1 + i, 1);
-      const mesParcela = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
-      
-      const novaDivida: Omit<Divida, 'id'> = {
-        mes: mesParcela,
-        valor: valorParcela,
-        motivo: `${parcelamento.descricao} (${i + 1}/${parcelamento.numeroParcelas})`,
+
+    // Mês da PRIMEIRA parcela (não é o mês da compra)
+    const [anoCompra, mesCompra] = parcelamento.mesInicio.split('-').map(Number);
+
+
+    // Criar parcelas FUTURAS:
+    // ParcelaAtual = mêsAtual
+    // Parcela p → mês = mesInicio + (p - 1)
+    const p = parcelamento.parcelaAtual;
+
+    const diff = p; // diferença desde o mês da compra (já corrigido)
+    const dataObj = new Date(anoCompra, (mesCompra - 1) + diff, 1);
+
+    const mesParcelaAtual = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
+
+    // verificar se já existe para este mês
+    const existsInCurrentMonth = dividas.some(
+      d =>
+        d.cartaoId === parcelamento.cartaoId &&
+        d.mes === mesParcelaAtual &&
+        d.motivo?.includes(parcelamento.descricao)
+    );
+
+    if (!existsInCurrentMonth) {
+      novasDividas.push({
+        mes: mesParcelaAtual,
+        valor: Number(valorParcelaBase.toFixed(2)),
+        motivo: `${parcelamento.descricao} (${p}/${parcelamento.numeroParcelas})`,
         categoria: 'cartao',
-        data: new Date(dataObj.getFullYear(), dataObj.getMonth(), 1).toISOString().split('T')[0],
+        data: dataObj.toISOString().split('T')[0],
         status: 'aberta',
         cartaoId: parcelamento.cartaoId,
         parcelamentoId: newParcelamento.id,
-      };
-      
-      novasDividas.push(novaDivida);
+      });
     }
 
+    for (let p = parcelamento.parcelaAtual + 1; p <= parcelamento.numeroParcelas; p++) {
+
+      // diferença desde a compra
+      const diff = p; // ← ALTERADO (p e não p-1)
+
+      // mês REAL da parcela:
+      // compra + 1 mês para a primeira parcela
+      const dataObj = new Date(anoCompra, (mesCompra - 1) + diff, 1);
+
+
+      const mesParcela = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
+
+      // último recebe diferença do arredondamento
+      const isLast = p === parcelamento.numeroParcelas;
+      const valor = isLast
+        ? Number((parcelamento.valorTotal - valorParcelaBase * (parcelamento.numeroParcelas - 1)).toFixed(2))
+        : Number(valorParcelaBase.toFixed(2));
+
+      novasDividas.push({
+        mes: mesParcela,
+        valor,
+        motivo: `${parcelamento.descricao} (${p}/${parcelamento.numeroParcelas})`,
+        categoria: 'cartao',
+        data: dataObj.toISOString().split('T')[0],
+        status: 'aberta',
+        cartaoId: parcelamento.cartaoId,
+        parcelamentoId: newParcelamento.id,
+      });
+    }
+
+    // console.log('Novas dívidas geradas pelo parcelamento:', novasDividas);
+    // return
+
+    // Adicionar dívidas geradas
     addDividas(novasDividas);
   };
+
 
   const deleteParcelamento = (id: string) => {
     setParcelamentos(parcelamentos.filter(p => p.id !== id));
@@ -156,9 +248,9 @@ export const useFinanceData = () => {
   const getSaldoAcumuladoAteOMes = (mesAlvo: string): number => {
     const mesesOrdenados = getMesesDisponiveis().sort();
     const indiceMesAlvo = mesesOrdenados.indexOf(mesAlvo);
-    
+
     if (indiceMesAlvo === -1) return 0;
-    
+
     let saldoAcumulado = 0;
     for (let i = 0; i <= indiceMesAlvo; i++) {
       const mes = mesesOrdenados[i];
@@ -168,7 +260,7 @@ export const useFinanceData = () => {
       const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
       saldoAcumulado += (totalRenda - totalDivida);
     }
-    
+
     return saldoAcumulado;
   };
 

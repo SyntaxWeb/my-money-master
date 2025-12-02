@@ -18,20 +18,20 @@ const COLORS = {
 };
 
 export default function Dashboard() {
-  const { 
-    addRenda, 
-    addDivida, 
+  const {
+    addRenda,
+    addDivida,
     addRendas,
     addDividas,
     addParcelamento,
     cartoes,
-    getBalancoMensal, 
-    getComparativo, 
-    getInsights, 
-    getMesesDisponiveis 
+    getBalancoMensal,
+    getComparativo,
+    getInsights,
+    getMesesDisponiveis
   } = useFinanceData();
   const mesesDisponiveis = getMesesDisponiveis();
-  
+
   const handleImportRendas = (newRendas: any[]) => {
     addRendas(newRendas);
   };
@@ -43,7 +43,7 @@ export default function Dashboard() {
   const handleImportFaturaCartao = (cartaoId: string, dividas: any[], parcelamentos: any[]) => {
     // Adicionar as dívidas
     addDividas(dividas);
-    
+
     // Adicionar os parcelamentos (que vão criar as parcelas automaticamente)
     parcelamentos.forEach(parc => {
       addParcelamento(parc);
@@ -98,37 +98,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <img src={logo} alt="SyntaxWeb" className="h-10 w-10 sm:h-12 sm:w-12 object-contain flex-shrink-0" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <ImportDialog 
-              onImportRendas={handleImportRendas}
-              onImportDividas={handleImportDividas}
-              onImportFaturaCartao={handleImportFaturaCartao}
-              cartoes={cartoes}
-            />
-            <Link to="/rendas">
-              <Button className="w-full sm:w-auto" variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Renda
-              </Button>
-            </Link>
-            <Link to="/despesas">
-              <Button className="w-full sm:w-auto" variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Despesa
-              </Button>
-            </Link>
-            <Link to="/cartoes">
-              <Button className="w-full sm:w-auto" variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Cartões
-              </Button>
-            </Link>
-          </div>
+        <div className="pt-2 pb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
@@ -283,7 +254,7 @@ export default function Dashboard() {
               <CardTitle>Renda x Despesas</CardTitle>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={chartHeight}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={chartDataMensal}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
@@ -300,7 +271,7 @@ export default function Dashboard() {
               <CardTitle>Distribuição por Categoria</CardTitle>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={chartHeight}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -327,7 +298,7 @@ export default function Dashboard() {
               <CardTitle>Evolução do Saldo</CardTitle>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={chartHeight}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={lineDataMeses}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
@@ -346,7 +317,7 @@ export default function Dashboard() {
               <CardTitle>Evolução Gastos Cartão</CardTitle>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={chartHeight}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={lineDataMeses}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
