@@ -1,73 +1,124 @@
-# Welcome to your Lovable project
 
-## Project info
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Build-React%20%2B%20TS-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/UI-shadcn%2Fui-purple?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/State-React%20Query-ff69b4?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Made%20by-SyntaxWeb-orange?style=for-the-badge" />
+</p>
 
-**URL**: https://lovable.dev/projects/b7608b33-a0d0-44fc-823c-125d51449e46
+🚀 Instalação & Uso – SyntaxFin
 
-## How can I edit this code?
+Este guia ensina como instalar, configurar e executar o SyntaxFin, o sistema financeiro desenvolvido pela SyntaxWeb.
 
-There are several ways of editing your application.
+✅ 1. Pré-requisitos
 
-**Use Lovable**
+Antes de iniciar, certifique-se de ter instalado:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b7608b33-a0d0-44fc-823c-125d51449e46) and start prompting.
+Tecnologia	Versão recomendada
+Node.js	≥ 18.x
+npm ou yarn	Última versão
+Git	Qualquer versão
 
-Changes made via Lovable will be committed automatically to this repo.
+Verifique rapidamente:
 
-**Use your preferred IDE**
+node -v
+npm -v
+git -v
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+📥 2. Baixar o projeto
+git clone https://github.com/SyntaxWeb/syntaxfin.git
+cd syntaxfin
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+📦 3. Instalar dependências
 
-Follow these steps:
+Usando npm:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+Ou yarn:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+yarn install
+
+⚙️ 4. Configurar o ambiente (opcional)
+
+Se o projeto possuir variáveis de ambiente:
+
+cp .env.example .env
+
+Se o arquivo `.env.example` não existir, crie-o manualmente na raiz do projeto e adicione as variáveis de ambiente necessárias, como por exemplo:
+
+
+Edite o arquivo .env com suas configurações.
+
+🏗️ 5. Executar em modo desenvolvimento
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Ou:
 
-**Use GitHub Codespaces**
+yarn dev
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
+Acesse o endereço informado no terminal (por padrão, http://localhost:5173, mas pode variar conforme a porta disponível).
 
-This project is built with:
+http://localhost:5173
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
 
-## How can I deploy this project?
+O Vite informará automaticamente a porta correta.
 
-Simply open [Lovable](https://lovable.dev/projects/b7608b33-a0d0-44fc-823c-125d51449e46) and click on Share -> Publish.
+🏁 6. Gerar build de produção
+npm run build
 
-## Can I connect a custom domain to my Lovable project?
 
-Yes, you can!
+Os arquivos finais ficarão disponíveis em:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+dist/
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+🔍 7. Visualizar o build localmente
+npm run preview
+
+🧼 8. Manter o projeto atualizado
+
+Puxe atualizações do repositório:
+
+git pull origin main
+
+
+Reinstale dependências se houver alterações:
+
+npm install
+
+🛠️ 9. Scripts Disponíveis
+Script	Função
+npm run dev	Inicia o servidor em modo desenvolvimento
+npm run build	Gera o pacote de produção
+npm run preview	Serve o build localmente
+npm run lint (opcional)	Roda o linter (se configurado)
+
+> Caso não tenha lint configurado, você pode adicionar o ESLint executando:
+> 
+> ```bash
+> npm install --save-dev eslint
+> npx eslint --init
+> ```
+🎉 Pronto!
+
+O SyntaxFin está instalado e funcionando.
+Agora você pode:
+
+Registrar rendas
+
+Registrar despesas
+
+Cadastrar cartões
+
+Importar faturas automáticas
+
+Exportar dados financeiros
+
+Gerenciar parcelamentos e faturas futuras
+
+Criado com ❤️ pela SyntaxWeb.
