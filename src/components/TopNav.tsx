@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import logo from '@/assets/syntaxweb-logo.jpg';
 import { Button } from '@/components/ui/button';
-import { Plus, Menu, X } from 'lucide-react';
+import { Plus, Menu, Download } from 'lucide-react';
 import { ImportDialog } from '@/components/ImportDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Sun, Moon } from 'lucide-react';
@@ -9,12 +9,31 @@ import { useTheme } from 'next-themes';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
+import { exportToExcel } from '@/utils/exportToExcel';
+import { toast } from 'sonner';
 
 export default function TopNav() {
-  const { cartoes, addRendas, addDividas, addParcelamento, cofrinhos } = useFinanceData();
+  const { cartoes, addRendas, addDividas, addParcelamento, cofrinhos, rendas, dividas, parcelamentos } = useFinanceData();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleExport = () => {
+    try {
+      exportToExcel({
+        rendas,
+        dividas,
+        cartoes,
+        parcelamentos,
+        cofrinhos,
+      });
+      toast.success('Dados exportados com sucesso!');
+      setIsMenuOpen(false);
+    } catch (error) {
+      toast.error('Erro ao exportar dados');
+      console.error('Export error:', error);
+    }
+  };
 
   const totalCofrinhos = cofrinhos.reduce((s, c) => s + (c.saldo || 0), 0).toFixed(2);
 
@@ -86,6 +105,15 @@ export default function TopNav() {
                       variant="outline"
                       size="default"
                       className="w-full justify-start"
+                      onClick={handleExport}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Excel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="w-full justify-start mt-2"
                       onClick={() => {
                         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
                       }}
@@ -148,6 +176,14 @@ export default function TopNav() {
               Cartões
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            title="Exportar dados para Excel"
+          >
+            <Download className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
