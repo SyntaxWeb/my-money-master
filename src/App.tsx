@@ -22,7 +22,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <TopNav />
-        <div style={{ paddingTop: 88 }}>
+        <div className="pt-16 md:pt-20">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/rendas" element={<Rendas />} />
