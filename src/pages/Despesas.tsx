@@ -24,6 +24,19 @@ export default function Despesas() {
     data: new Date().toISOString().slice(0, 10),
   });
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<{
+    valor: string;
+    motivo: string;
+    categoria: 'cartao' | 'fixa' | 'variavel' | 'outro';
+    data: string;
+  }>({
+    valor: '',
+    motivo: '',
+    categoria: 'variavel',
+    data: new Date().toISOString().slice(0, 10),
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.valor || !formData.motivo) {
@@ -294,7 +307,7 @@ export default function Despesas() {
             return (
               <Card key={mes}>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-4">
                     <CardTitle>
                       {(() => {
                         const [ano, mesNum] = mes.split('-').map(Number);
@@ -302,13 +315,31 @@ export default function Despesas() {
                         return data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
                       })()}
                     </CardTitle>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-red-600">
-                        Total: R$ {totalMes.toFixed(2)}
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-red-600">
+                          Total: R$ {totalMes.toFixed(2)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {pagas} pagas | {abertas} abertas
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {pagas} pagas | {abertas} abertas
-                      </div>
+                      {abertas > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const abertasDoMes = dividasDoMes.filter((d) => d.status === 'aberta');
+                            for (const d of abertasDoMes) {
+                              // eslint-disable-next-line no-await-in-loop
+                              await updateDivida(d.id, { status: 'paga' });
+                            }
+                            toast.success('Todas as despesas deste mês foram marcadas como pagas');
+                          }}
+                        >
+                          Marcar todas como pagas
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -320,52 +351,159 @@ export default function Despesas() {
                         className={`flex justify-between items-center p-3 border rounded-md ${divida.status === 'paga' ? 'border-green-600 bg-green-50 dark:bg-green-950/20' : 'border-border'
                           }`}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground">{divida.motivo}</p>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                                {categoriasLabels[divida.categoria]}
-                              </span>
-                              {divida.parcelamentoId && (
-                                <span className="text-xs px-2 py-1 rounded-full bg-accent text-accent-foreground">Parcelado</span>
+
+                        <div className='flex-1'>
+                          <div className='row'>
+                            <div className='col-12 flex'>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-foreground">{divida.motivo}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
+                                      {categoriasLabels[divida.categoria]}
+                                    </span>
+                                    {divida.parcelamentoId && (
+                                      <span className="text-xs px-2 py-1 rounded-full bg-accent text-accent-foreground">Parcelado</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(divida.data).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <p className="text-lg font-semibold text-red-600">
+                                  R$ {divida.valor.toFixed(2)}
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingId(divida.id);
+                                    setEditData({
+                                      valor: String(divida.valor),
+                                      motivo: divida.motivo,
+                                      categoria: divida.categoria,
+                                      data: divida.data,
+                                    });
+                                  }}
+                                >
+                                  Editar
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    await updateDivida(divida.id, {
+                                      status: divida.status === 'paga' ? 'aberta' : 'paga'
+                                    });
+                                    toast.success(divida.status === 'paga' ? 'Marcada como aberta' : 'Marcada como paga');
+                                  }}
+                                >
+                                  {divida.status === 'paga' ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                  ) : (
+                                    <Circle className="w-5 h-5 text-muted-foreground" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    await deleteDivida(divida.id);
+                                    toast.success('Despesa removida');
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className='col-12'>
+                              {editingId === divida.id && (
+                                <div className="mt-3 w-full border-t pt-3">
+                                  <div className="grid gap-2 md:grid-cols-4">
+                                    <div>
+                                      <Label className="text-xs">Valor</Label>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={editData.valor}
+                                        onChange={(e) => setEditData({ ...editData, valor: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Data</Label>
+                                      <Input
+                                        type="date"
+                                        value={editData.data}
+                                        onChange={(e) => setEditData({ ...editData, data: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Categoria</Label>
+                                      <Select
+                                        value={editData.categoria}
+                                        onValueChange={(value: any) =>
+                                          setEditData({ ...editData, categoria: value })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-9">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="cartao">Cartão</SelectItem>
+                                          <SelectItem value="fixa">Conta Fixa</SelectItem>
+                                          <SelectItem value="variavel">Variável</SelectItem>
+                                          <SelectItem value="outro">Outro</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Motivo</Label>
+                                      <Input
+                                        type="text"
+                                        value={editData.motivo}
+                                        onChange={(e) => setEditData({ ...editData, motivo: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end gap-2 mt-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingId(null);
+                                      }}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        const valorNum = parseFloat(editData.valor);
+                                        if (Number.isNaN(valorNum)) {
+                                          toast.error('Valor inválido');
+                                          return;
+                                        }
+                                        const novoMes = editData.data.slice(0, 7);
+                                        await updateDivida(divida.id, {
+                                          valor: valorNum,
+                                          motivo: editData.motivo,
+                                          categoria: editData.categoria,
+                                          data: editData.data,
+                                          mes: novoMes,
+                                        });
+                                        toast.success('Despesa atualizada');
+                                        setEditingId(null);
+                                      }}
+                                    >
+                                      Salvar
+                                    </Button>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(divida.data).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-lg font-semibold text-red-600">
-                            R$ {divida.valor.toFixed(2)}
-                          </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              await updateDivida(divida.id, {
-                                status: divida.status === 'paga' ? 'aberta' : 'paga'
-                              });
-                              toast.success(divida.status === 'paga' ? 'Marcada como aberta' : 'Marcada como paga');
-                            }}
-                          >
-                            {divida.status === 'paga' ? (
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-muted-foreground" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              await deleteDivida(divida.id);
-                              toast.success('Despesa removida');
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
                         </div>
                       </div>
                     ))}

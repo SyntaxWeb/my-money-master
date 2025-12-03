@@ -183,17 +183,63 @@ export const useFinanceData = () => {
   };
 
   const updateDivida = async (id: string, updates: Partial<Divida>) => {
+    const existing = dividas.find((d) => d.id === id);
+
     const updated = await apiRequest<DividaApi>(`/dividas/${id}`, 'PATCH', {
-      mes: updates.mes,
-      valor: updates.valor,
-      motivo: updates.motivo,
-      categoria: updates.categoria,
-      data: updates.data,
-      status: updates.status,
-      cartao_id: updates.cartaoId ? Number(updates.cartaoId) : undefined,
-      parcelamento_id: updates.parcelamentoId ? Number(updates.parcelamentoId) : undefined,
+      mes: updates.mes ?? existing?.mes,
+      valor: updates.valor ?? existing?.valor,
+      motivo: updates.motivo ?? existing?.motivo,
+      categoria: updates.categoria ?? existing?.categoria,
+      data: updates.data ?? existing?.data,
+      status: updates.status ?? existing?.status,
+      cartao_id: (updates.cartaoId ?? existing?.cartaoId) ? Number(updates.cartaoId ?? existing?.cartaoId) : undefined,
+      parcelamento_id: (updates.parcelamentoId ?? existing?.parcelamentoId)
+        ? Number(updates.parcelamentoId ?? existing?.parcelamentoId)
+        : undefined,
     });
-    setDividas((prev) => prev.map((d) => (d.id === id ? mapDivida(updated) : d)));
+
+    const mapped = mapDivida(updated);
+    setDividas((prev) => prev.map((d) => (d.id === id ? mapped : d)));
+
+    // Programação de contas fixas: ao marcar uma conta fixa como paga, cria a do próximo mês
+    if (
+      existing &&
+      existing.categoria === 'fixa' &&
+      existing.status !== 'paga' &&
+      mapped.status === 'paga'
+    ) {
+      const [y, m] = existing.mes.split('-').map(Number);
+      if (y && m) {
+        const base = new Date(y, m); // next month
+        const nextMes = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+
+        const alreadyExists = dividas.some(
+          (d) =>
+            d.categoria === 'fixa' &&
+            d.mes === nextMes &&
+            d.motivo === existing.motivo &&
+            d.valor === existing.valor,
+        );
+
+        if (!alreadyExists) {
+          const nextDate = new Date(
+            Number(existing.data.slice(0, 4)),
+            Number(existing.data.slice(5, 7)),
+            1,
+          );
+          const dataProximoMes = nextDate.toISOString().split('T')[0];
+
+          await addDivida({
+            mes: nextMes,
+            valor: existing.valor,
+            motivo: existing.motivo,
+            categoria: 'fixa',
+            data: dataProximoMes,
+            status: 'aberta',
+          });
+        }
+      }
+    }
   };
 
   const deleteDivida = async (id: string) => {
@@ -283,7 +329,7 @@ export const useFinanceData = () => {
 
     // Parcela atual
     const pAtual = parcelamento.parcelaAtual;
-    const diffAtual = pAtual;
+    const diffAtual = pAtual -1;
     const dataAtual = new Date(anoCompra, mesCompra - 1 + diffAtual, 1);
     const mesParcelaAtual = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, '0')}`;
 
@@ -305,7 +351,7 @@ export const useFinanceData = () => {
     }
 
     for (let p = parcelamento.parcelaAtual + 1; p <= parcelamento.numeroParcelas; p++) {
-      const diff = p;
+      const diff = p - 1;
       const dataObj = new Date(anoCompra, mesCompra - 1 + diff, 1);
       const mesParcela = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
 
@@ -458,7 +504,8 @@ export const useFinanceData = () => {
     for (let i = 0; i <= indiceMesAlvo; i++) {
       const mes = mesesOrdenados[i];
       const rendasMes = rendas.filter((r) => r.mes === mes);
-      const dividasMes = dividas.filter((d) => d.mes === mes);
+      // Para saldo acumulado, considerar apenas despesas em aberto (não pagas)
+      const dividasMes = dividas.filter((d) => d.mes === mes && d.status !== 'paga');
       const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
       const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
       saldoAcumulado += totalRenda - totalDivida;
@@ -620,4 +667,3 @@ export const useFinanceData = () => {
     getMesesDisponiveis,
   };
 };
-

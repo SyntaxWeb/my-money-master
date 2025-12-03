@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Trash2, CreditCard, Plus, Receipt, TrendingUp, AlertCircle } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import type { Cartao, Divida } from '@/types/finance';
 
 const Cartoes = () => {
   const { cartoes, dividas, addCartao, deleteCartao, addParcelamento, getParcelamentosByCartao, getMesesDisponiveis } = useFinanceData();
@@ -28,7 +30,7 @@ const Cartoes = () => {
   // Form parcelamento
   const [cartaoSelecionado, setCartaoSelecionado] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [valorTotal, setValorTotal] = useState('');
+  const [valorParcela, setValorParcela] = useState('');
   const [numeroParcelas, setNumeroParcelas] = useState('');
   const [mesInicio, setMesInicio] = useState('');
 
@@ -67,7 +69,7 @@ const Cartoes = () => {
   const handleSubmitParcelamento = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!cartaoSelecionado || !descricao || !valorTotal || !numeroParcelas || !mesInicio) {
+    if (!cartaoSelecionado || !descricao || !valorParcela || !numeroParcelas || !mesInicio) {
       toast({
         title: 'Erro',
         description: 'Preencha todos os campos',
@@ -75,11 +77,25 @@ const Cartoes = () => {
       });
       return;
     }
+
+    const valorParcelaNum = parseFloat(valorParcela);
+    const numeroParcelasNum = parseInt(numeroParcelas, 10);
+    if (Number.isNaN(valorParcelaNum) || Number.isNaN(numeroParcelasNum) || numeroParcelasNum <= 0) {
+      toast({
+        title: 'Erro',
+        description: 'Informe um valor de parcela e número de parcelas válidos',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const valorTotalNum = Number((valorParcelaNum * numeroParcelasNum).toFixed(2));
+
     console.log('Adicionando parcelamento:', {
-     cartaoId: cartaoSelecionado,
+      cartaoId: cartaoSelecionado,
       descricao,
-      valorTotal: parseFloat(valorTotal),
-      numeroParcelas: parseInt(numeroParcelas),
+      valorTotal: valorTotalNum,
+      numeroParcelas: numeroParcelasNum,
       parcelaAtual: 1,
       mesInicio,
       categoria: 'cartao',
@@ -88,8 +104,8 @@ const Cartoes = () => {
     await addParcelamento({
       cartaoId: cartaoSelecionado,
       descricao,
-      valorTotal: parseFloat(valorTotal),
-      numeroParcelas: parseInt(numeroParcelas),
+      valorTotal: valorTotalNum,
+      numeroParcelas: numeroParcelasNum,
       parcelaAtual: 1,
       mesInicio,
       categoria: 'cartao',
@@ -97,7 +113,7 @@ const Cartoes = () => {
 
     setCartaoSelecionado('');
     setDescricao('');
-    setValorTotal('');
+    setValorParcela('');
     setNumeroParcelas('');
     setMesInicio('');
 
@@ -107,19 +123,57 @@ const Cartoes = () => {
     });
   };
 
-  // Função para calcular gastos do cartão no mês
-  const getGastosCartaoNoMes = (cartaoId: string, mes: string) => {
+  const addMonthsToYYYYMM = (base: string, monthsToAdd: number): string => {
+    const [y, m] = base.split('-').map(Number);
+    if (!y || !m) return base;
+    const d = new Date(y, m - 1 + monthsToAdd, 1);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yy}-${mm}`;
+  };
+
+  const getCompetenceMonthForTransaction = (dateStr: string, closingDay: number): string | null => {
+    if (!dateStr) return null;
+    const [ys, ms, ds] = dateStr.split('-');
+    const y = Number(ys);
+    const m = Number(ms);
+    const d = Number(ds);
+    if (!y || !m || !d) return null;
+    const base = new Date(y, m - 1, 1);
+    if (d > closingDay) {
+      base.setMonth(base.getMonth() + 1);
+    }
+    const yy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, '0');
+    return `${yy}-${mm}`;
+  };
+
+  const getFaturaMonthForDivida = (divida: Divida, cartao: Cartao): string | null => {
+    // Para dívidas vinculadas a parcelamento, assumimos que divida.mes já é o mês da fatura
+    if (divida.parcelamentoId) {
+      return divida.mes;
+    }
+    const competencia = getCompetenceMonthForTransaction(divida.data, cartao.diaFechamento);
+    if (!competencia) return divida.mes;
+    // mês da fatura (pagamento) é competência + 1
+    return addMonthsToYYYYMM(competencia, 1);
+  };
+
+  // Função para calcular gastos do cartão no mês (mês da fatura), respeitando dia de fechamento
+  const getGastosCartaoNoMes = (cartao: Cartao, mesFatura: string) => {
     return dividas
-      .filter(d => d.mes === mes && d.categoria === 'cartao' && d.cartaoId === cartaoId)
+      .filter((d) => d.categoria === 'cartao' && d.cartaoId === cartao.id)
+      .filter((d) => getFaturaMonthForDivida(d, cartao) === mesFatura)
       .reduce((sum, d) => sum + d.valor, 0);
   };
 
-  // Função para pegar parcelas do cartão no mês
-  const getParcelasDoMes = (cartaoId: string, mes: string) => {
+  // Função para pegar parcelas/compras do cartão no mês da fatura
+  const getParcelasDoMes = (cartao: Cartao, mesFatura: string) => {
     return dividas.filter(
-      d => d.mes === mes && 
-      d.categoria === 'cartao' && 
-      d.cartaoId === cartaoId
+      (d) =>
+        d.categoria === 'cartao' &&
+        d.cartaoId === cartao.id &&
+        getFaturaMonthForDivida(d, cartao) === mesFatura,
     );
   };
 
@@ -250,13 +304,13 @@ const Cartoes = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="valorTotal">Valor Total (R$)</Label>
+                  <Label htmlFor="valorParcela">Valor da Parcela (R$)</Label>
                   <Input
-                    id="valorTotal"
+                    id="valorParcela"
                     type="number"
                     step="0.01"
-                    value={valorTotal}
-                    onChange={(e) => setValorTotal(e.target.value)}
+                    value={valorParcela}
+                    onChange={(e) => setValorParcela(e.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -383,6 +437,15 @@ const Cartoes = () => {
                     ))}
                   </select>
                 </div>
+
+                <Alert className="mt-4">
+                  <AlertDescription className="text-xs">
+                    Atenção: alguns bancos podem adiantar ou adiar parcelas para outro mês de forma automática.
+                    O sistema calcula as faturas pelo dia de fechamento do cartão, mas não consegue detectar
+                    essas mudanças específicas do banco. Revise a fatura real do cartão para garantir que os
+                    valores e parcelas estejam alinhados.
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
 
@@ -394,8 +457,8 @@ const Cartoes = () => {
               ) : (
                 <div className="grid gap-4">
                   {cartoes.map((cartao) => {
-                    const gastosDoMes = getGastosCartaoNoMes(cartao.id, mesSelecionado);
-                    const parcelasDoMes = getParcelasDoMes(cartao.id, mesSelecionado);
+                    const gastosDoMes = getGastosCartaoNoMes(cartao, mesSelecionado);
+                    const parcelasDoMes = getParcelasDoMes(cartao, mesSelecionado);
                     const percentualUsado = (gastosDoMes / cartao.limite) * 100;
                     const proximoAoLimite = percentualUsado > 80;
 

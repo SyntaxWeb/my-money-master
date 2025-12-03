@@ -18,6 +18,70 @@ interface ImportDialogProps {
 
 type ImportType = 'rendas' | 'dividas' | 'fatura';
 
+const extractMonthFromCell = (value: any): string | null => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  const match = str.match(/^(\d{4})-(\d{2})/);
+  if (match) {
+    return `${match[1]}-${match[2]}`;
+  }
+  return null;
+};
+
+const extractDateFromCell = (value: any): string | null => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  return null;
+};
+
+const parseValor = (value: any): number => {
+  if (typeof value === 'number') return value;
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+  // remove possível separador de milhar e trata vírgula como decimal
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
+  return Number(normalized);
+};
+
+const addMonthsToYYYYMM = (base: string, monthsToAdd: number): string => {
+  const [y, m] = base.split('-').map(Number);
+  if (!y || !m) return base;
+  const d = new Date(y, m - 1 + monthsToAdd, 1);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}`;
+};
+
+const getCompetenceMonthForTransaction = (dateStr: string, closingDay: number): string | null => {
+  if (!dateStr) return null;
+  const [ys, ms, ds] = dateStr.split('-');
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = Number(ds);
+  if (!y || !m || !d) return null;
+  const base = new Date(y, m - 1, 1);
+  if (d > closingDay) {
+    base.setMonth(base.getMonth() + 1);
+  }
+  const yy = base.getFullYear();
+  const mm = String(base.getMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}`;
+};
+
 export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCartao, cartoes = [] }: ImportDialogProps) {
   const [open, setOpen] = useState(false);
   const [importType, setImportType] = useState<ImportType>('rendas');
@@ -56,15 +120,20 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
         // Detect months in the file and default fatura month (most frequent)
         const months: Record<string, number> = {};
         jsonData.forEach((r: any) => {
-          if (!r.data) return;
-          const mon = String(r.data).substring(0, 7);
-          if (mon) months[mon] = (months[mon] || 0) + 1;
+          const mon = extractMonthFromCell(r.data);
+          if (mon) {
+            months[mon] = (months[mon] || 0) + 1;
+          }
         });
         const monthsKeys = Object.keys(months);
         if (monthsKeys.length > 0) {
-          // choose the latest month available in the file as default invoice month
+          // usa o mês SEGUINTE ao último mês presente nas transações como mês da fatura
           monthsKeys.sort();
-          setFaturaMes(monthsKeys[monthsKeys.length - 1]);
+          const lastMon = monthsKeys[monthsKeys.length - 1];
+          const [y, m] = lastMon.split('-').map(Number);
+          const next = new Date(y, m); // m já está em 1–12, Date usa 0–11
+          const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+          setFaturaMes(nextStr);
         } else {
           setFaturaMes(new Date().toISOString().slice(0, 7));
         }
@@ -167,9 +236,14 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, origem)`);
           }
 
+          const valor = parseValor(row.valor);
+          if (Number.isNaN(valor)) {
+            throw new Error(`Linha ${index + 1}: valor inválido (não numérico)`);
+          }
+
           return {
             mes: String(row.mes).trim(),
-            valor: Number(row.valor),
+            valor,
             origem: String(row.origem).trim(),
             data: row.data ? String(row.data).trim() : new Date().toISOString().split('T')[0]
           };
@@ -186,6 +260,11 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
             throw new Error(`Linha ${index + 1}: campos obrigatórios faltando (mes, valor, motivo, categoria)`);
           }
 
+          const valor = parseValor(row.valor);
+          if (Number.isNaN(valor)) {
+            throw new Error(`Linha ${index + 1}: valor inválido (não numérico)`);
+          }
+
           const categoria = String(row.categoria).toLowerCase().trim();
           if (!['cartao', 'fixa', 'variavel', 'outro'].includes(categoria)) {
             throw new Error(`Linha ${index + 1}: categoria inválida (use: cartao, fixa, variavel, outro)`);
@@ -198,7 +277,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
           return {
             mes: String(row.mes).trim(),
-            valor: Number(row.valor),
+            valor,
             motivo: String(row.motivo).trim(),
             categoria: categoria as 'cartao' | 'fixa' | 'variavel' | 'outro',
             data: row.data ? String(row.data).trim() : new Date().toISOString().split('T')[0],
@@ -213,11 +292,26 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
         });
       } else if (importType === 'fatura' && onImportFaturaCartao) {
         // Processar fatura do cartão
+        const cartao = cartoes.find((c) => c.id === cartaoSelecionado);
+        const closingDay = cartao?.diaFechamento ?? 31;
         const dividasMap = new Map<string, any[]>();
 
-        importData.forEach((row: any) => {
+        importData.forEach((row: any, index: number) => {
           if (!row.descricao || !row.valor || !row.data) {
             throw new Error('Campos obrigatórios da fatura: descricao, valor, data');
+          }
+
+          const valor = parseValor(row.valor);
+          if (Number.isNaN(valor)) {
+            throw new Error(`Linha ${index + 1}: valor inválido na fatura (não numérico)`);
+          }
+          // pagamentos/estornos (valor <= 0) não viram despesa
+          if (valor <= 0) {
+            return;
+          }
+          const dataStr = extractDateFromCell(row.data);
+          if (!dataStr) {
+            throw new Error(`Linha ${index + 1}: data inválida na fatura (esperado YYYY-MM-DD)`);
           }
 
           const deteccao = detectarParcela(row);
@@ -237,6 +331,8 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
           dividasMap.get(key)!.push({
             ...row,
+            valor,
+            data: dataStr,
             deteccao,
             descricaoBase,
             key
@@ -264,22 +360,26 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
           return (ey - sy) * 12 + (em - sm);
         };
 
-        // Detectar mês da fatura a partir das transações (mês mais frequente entre as datas)
-        const detectInvoiceMonth = (rows: any[]) => {
+        // Detectar mês da fatura (mês do pagamento) a partir das transações,
+        // considerando o dia de fechamento do cartão.
+        const detectInvoiceMonth = (rows: any[], closing: number) => {
           const freq: Record<string, number> = {};
           rows.forEach(r => {
-            if (!r.data) return;
-            const mon = String(r.data).substring(0, 7);
-            if (!mon) return;
-            freq[mon] = (freq[mon] || 0) + 1;
+            const dataStr = extractDateFromCell(r.data);
+            if (!dataStr) return;
+            const competencia = getCompetenceMonthForTransaction(dataStr, closing);
+            if (!competencia) return;
+            freq[competencia] = (freq[competencia] || 0) + 1;
           });
           const entries = Object.entries(freq);
           if (entries.length === 0) return formatYYYYMM(new Date());
           entries.sort((a, b) => b[1] - a[1]);
-          return entries[0][0];
+          const competenciaMaisFrequente = entries[0][0]; // mês de competência das compras
+          // mês da fatura (pagamento) é o mês seguinte ao de competência
+          return addMonthsToYYYYMM(competenciaMaisFrequente, 1);
         };
 
-        const invoiceMonthStr = detectInvoiceMonth(importData);
+        const invoiceMonthStr = detectInvoiceMonth(importData, closingDay);
 
         // Processar cada grupo
         dividasMap.forEach((items, descricaoBase) => {
@@ -290,7 +390,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
             // É um parcelamento (usando apenas os itens parcelados do grupo)
             const primeiraTransacao = parcelItems.reduce((a, b) => (new Date(String(a.data)) <= new Date(String(b.data)) ? a : b), parcelItems[0]);
             const currentMonthStr = faturaMes || invoiceMonthStr;
-            const itemInCurrentMonth = parcelItems.find(it => String(it.data).substring(0, 7) === currentMonthStr);
+            const itemInCurrentMonth = parcelItems.find(it => extractMonthFromCell(it.data) === currentMonthStr);
             const parcelaAtualDetectada = Math.max(...parcelItems.map(it => it.deteccao.parcelaAtual || 0)) || 1;
             const totalParcelasCandidates = parcelItems.map(it => it.deteccao.totalParcelas || 0).filter(Boolean);
             const totalParcelas = totalParcelasCandidates.length > 0 ? Math.max(...totalParcelasCandidates) : parcelItems.length;
@@ -307,7 +407,7 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
               valorTotal = somaParcelasPresentes;
             }
 
-            const itemCorrespondente = parcelItems.find(it => it.deteccao.parcelaAtual === parcelaAtualDetectada) ?? parcelItems.find(it => String(it.data).substring(0, 7) === currentMonthStr) ?? (parcelItems.length === 1 ? parcelItems[0] : undefined);
+            const itemCorrespondente = parcelItems.find(it => it.deteccao.parcelaAtual === parcelaAtualDetectada) ?? parcelItems.find(it => extractMonthFromCell(it.data) === currentMonthStr) ?? (parcelItems.length === 1 ? parcelItems[0] : undefined);
 
             if (itemCorrespondente) {
               dividas.push({
@@ -343,14 +443,15 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
 
           if (singleItems.length > 0) {
             singleItems.forEach(item => {
-              const dataStr = String(item.data);
-              const mes = dataStr.length >= 7 ? dataStr.substring(0, 7) : new Date().toISOString().substring(0, 7);
+              const dataStr = extractDateFromCell(item.data) ?? new Date().toISOString().slice(0, 10);
+              const competencia = getCompetenceMonthForTransaction(dataStr, closingDay) ?? dataStr.substring(0, 7);
+              const mes = addMonthsToYYYYMM(competencia, 1);
               dividas.push({
                 mes,
-                valor: Number(item.valor),
+                valor: item.valor,
                 motivo: item.descricao,
                 categoria: 'cartao',
-                data: dataStr.length >= 10 ? dataStr.substring(0, 10) : new Date().toISOString().split('T')[0],
+                data: dataStr,
                 status: 'aberta',
                 cartaoId: cartaoSelecionado
               });
@@ -441,8 +542,20 @@ export function ImportDialog({ onImportRendas, onImportDividas, onImportFaturaCa
                   <Label htmlFor="fatura-mes">Mês da Fatura</Label>
                   <select id="fatura-mes" value={faturaMes} onChange={(e) => setFaturaMes(e.target.value)} className="px-3 py-2 border border-border rounded-md w-full">
                     {(() => {
-                      const uniqueMonths = Array.from(new Set(importData.map((r: any) => String(r.data).substring(0, 7)).filter(Boolean)));
-                      const months = uniqueMonths.length > 0 ? uniqueMonths : [new Date().toISOString().slice(0, 7)];
+                      const uniqueMonths = Array.from(new Set(importData.map((r: any) => extractMonthFromCell(r.data)).filter(Boolean)));
+                      let months = uniqueMonths.length > 0 ? uniqueMonths : [];
+                      if (uniqueMonths.length > 0) {
+                        const sorted = [...uniqueMonths].sort();
+                        const [y, m] = sorted[sorted.length - 1].split('-').map(Number);
+                        const next = new Date(y, m); // próximo mês
+                        const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+                        if (!months.includes(nextStr)) {
+                          months = [...months, nextStr];
+                        }
+                      }
+                      if (months.length === 0) {
+                        months = [new Date().toISOString().slice(0, 7)];
+                      }
                       return months.map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ));

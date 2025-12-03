@@ -84,22 +84,54 @@ export default function Dashboard() {
   const mesAnterior = mesesDisponiveis[mesesDisponiveis.indexOf(mesSelecionado) + 1];
   const comparativo = mesAnterior ? getComparativo(mesSelecionado, mesAnterior) : null;
 
-  const getRecentMonths = (n: number) => mesesDisponiveis.slice(0, n).reverse();
+  const getRecentMonths = (n: number) => {
+    const sortedAsc = [...mesesDisponiveis].sort(); // YYYY-MM em ordem cronológica
+    const idx = sortedAsc.indexOf(mesSelecionado);
+    if (idx === -1) {
+      // fallback: usa os últimos n meses disponíveis
+      return sortedAsc.slice(-n);
+    }
+    // começa no mês selecionado e segue para frente
+    return sortedAsc.slice(idx, idx + n);
+  };
 
   const chartDataMensal = getRecentMonths(rangeMonths).map(mes => {
     const b = getBalancoMensal(mes);
-    return { name: new Date(mes + '-01').toLocaleDateString('pt-BR', { month: 'short' }), valor: b.totalRenda, despesa: b.totalDivida };
+    const [ano, mesNum] = mes.split('-').map(Number);
+    const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
+    return {
+      name: data.toLocaleDateString('pt-BR', { month: 'short' }),
+      valor: b.totalRenda,
+      despesa: b.totalDivida,
+    };
   });
 
+  const getPrevMonthString = (mes: string): string | null => {
+    const [ano, mesNum] = mes.split('-').map(Number);
+    if (!ano || !mesNum) return null;
+    const d = new Date(ano, mesNum - 1, 1);
+    d.setMonth(d.getMonth() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
+
+  const mesCartaoReferencia = getPrevMonthString(mesSelecionado);
+  const balancoCartaoReferencia = mesCartaoReferencia ? getBalancoMensal(mesCartaoReferencia) : balanco;
+  const valorCartaoMesAtual = balancoCartaoReferencia.gastosPorCategoria.cartao;
+
   const pieData = [
-    { name: 'Cartão', value: balanco.gastosPorCategoria.cartao },
+    { name: 'Cartão', value: valorCartaoMesAtual },
     { name: 'Fixas', value: balanco.gastosPorCategoria.fixa },
     { name: 'Variáveis', value: balanco.gastosPorCategoria.variavel },
     { name: 'Outras', value: balanco.gastosPorCategoria.outro },
   ].filter(item => item.value > 0);
 
+
   const lineDataMeses = getRecentMonths(rangeMonths).map(mes => {
     const b = getBalancoMensal(mes);
+    const mesRefCartao = getPrevMonthString(mes);
+    const bCartaoRef = mesRefCartao ? getBalancoMensal(mesRefCartao) : b;
 
     const [ano, mesNum] = mes.split('-').map(Number);
     const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
@@ -108,7 +140,7 @@ export default function Dashboard() {
       mes: data.toLocaleDateString('pt-BR', { month: 'short' }),
       saldoMes: b.saldoMes,
       saldoAcumulado: b.saldoAcumulado,
-      cartao: b.gastosPorCategoria.cartao,
+      cartao: bCartaoRef.gastosPorCategoria.cartao,
     };
 
   });
