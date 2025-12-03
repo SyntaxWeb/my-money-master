@@ -17,13 +17,13 @@ export default function Rendas() {
     data: new Date().toISOString().slice(0, 10),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.valor || !formData.origem) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
-    addRenda({
+    await addRenda({
       mes: formData.mes,
       valor: parseFloat(formData.valor),
       origem: formData.origem,
@@ -155,8 +155,8 @@ export default function Rendas() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              deleteRenda(renda.id);
+                            onClick={async () => {
+                              await deleteRenda(renda.id);
                               toast.success('Renda removida');
                             }}
                           >

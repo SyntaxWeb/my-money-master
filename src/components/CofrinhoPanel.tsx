@@ -27,10 +27,10 @@ export const CofrinhoPanel: React.FC = () => {
   const [depositValues, setDepositValues] = useState<Record<string, number>>({});
   const [withdrawValues, setWithdrawValues] = useState<Record<string, number>>({});
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!nome) return;
     const initial = Number(valorInicial || 0);
-    const created = addCofrinho({ nome, descricao, saldo: 0 }, initial, mesSelecionado);
+    const created = await addCofrinho({ nome, descricao, saldo: 0 }, initial, mesSelecionado);
     if (initial > 0 && !created) {
       toast({ title: 'Saldo insuficiente', description: 'Depósito inicial não realizado: saldo do mês insuficiente.' });
     } else if (initial > 0 && created) {
@@ -43,10 +43,10 @@ export const CofrinhoPanel: React.FC = () => {
     setValorInicial('');
   };
 
-  const handleDeposit = (id: string) => {
+  const handleDeposit = async (id: string) => {
     const amount = Number(depositValues[id] || 0);
     if (!amount || amount <= 0) return;
-    const ok = depositToCofrinho(id, amount, mesSelecionado);
+    const ok = await depositToCofrinho(id, amount, mesSelecionado);
     if (!ok) {
       toast({ title: 'Saldo insuficiente', description: 'Saldo do mês insuficiente para este depósito.' });
       return;
@@ -55,7 +55,7 @@ export const CofrinhoPanel: React.FC = () => {
     setDepositValues({ ...depositValues, [id]: 0 });
   };
 
-  const handleWithdraw = (id: string) => {
+  const handleWithdraw = async (id: string) => {
     const amount = Number(withdrawValues[id] || 0);
     if (!amount || amount <= 0) return;
     // Handle withdraw success/failure
@@ -65,7 +65,7 @@ export const CofrinhoPanel: React.FC = () => {
       toast({ title: 'Saldo insuficiente', description: 'Saldo do cofrinho insuficiente para esta retirada.' });
       return;
     }
-    withdrawFromCofrinho(id, amount, mesSelecionado);
+    await withdrawFromCofrinho(id, amount, mesSelecionado);
     toast({ title: 'Retirada realizada', description: `R$ ${amount.toFixed(2)} adicionado ao mês ${mesSelecionado}.` });
     setWithdrawValues({ ...withdrawValues, [id]: 0 });
   };

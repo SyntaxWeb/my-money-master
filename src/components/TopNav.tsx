@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import logo from '@/assets/syntaxweb-logo.jpg';
 import { Button } from '@/components/ui/button';
 import { Plus, Menu, Download } from 'lucide-react';
@@ -11,12 +11,25 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useState } from 'react';
 import { exportToExcel } from '@/utils/exportToExcel';
 import { toast } from 'sonner';
+import { apiRequest } from '@/lib/api';
 
 export default function TopNav() {
   const { cartoes, addRendas, addDividas, addParcelamento, cofrinhos, rendas, dividas, parcelamentos } = useFinanceData();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest('/logout', 'POST');
+    } catch (error) {
+      console.error('Erro ao fazer logout', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      navigate('/login');
+    }
+  };
 
   const handleExport = () => {
     try {
@@ -62,17 +75,22 @@ export default function TopNav() {
                 </SheetHeader>
                 <div className="flex flex-col gap-3 mt-6">
                   <ImportDialog
-                    onImportRendas={(rendas) => {
-                      addRendas(rendas);
+                    onImportRendas={async (rendas) => {
+                      await addRendas(rendas);
                       setIsMenuOpen(false);
                     }}
-                    onImportDividas={(dividas) => {
-                      addDividas(dividas);
+                    onImportDividas={async (dividas) => {
+                      await addDividas(dividas);
                       setIsMenuOpen(false);
                     }}
-                    onImportFaturaCartao={(cartaoId, dividas, parcelamentos) => {
-                      if (dividas && dividas.length) addDividas(dividas);
-                      if (parcelamentos && parcelamentos.length) parcelamentos.forEach(p => addParcelamento(p));
+                    onImportFaturaCartao={async (cartaoId, dividas, parcelamentos) => {
+                      if (dividas && dividas.length) await addDividas(dividas);
+                      if (parcelamentos && parcelamentos.length) {
+                        for (const p of parcelamentos) {
+                          // eslint-disable-next-line no-await-in-loop
+                          await addParcelamento(p);
+                        }
+                      }
                       setIsMenuOpen(false);
                     }}
                     cartoes={cartoes}
@@ -98,6 +116,11 @@ export default function TopNav() {
                   <Link to="/cofrinhos" onClick={() => setIsMenuOpen(false)}>
                     <Button className="w-full justify-start" variant="outline" size="default">
                       Cofrinhos
+                    </Button>
+                  </Link>
+                  <Link to="/profile" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="w-full justify-start" variant="outline" size="default">
+                      Meu Perfil
                     </Button>
                   </Link>
                   <div className="border-t border-border pt-3 mt-2">
@@ -130,6 +153,14 @@ export default function TopNav() {
                         </>
                       )}
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="default"
+                      className="w-full justify-start mt-2"
+                      onClick={handleLogout}
+                    >
+                      Sair
+                    </Button>
                   </div>
                 </div>
               </SheetContent>
@@ -150,11 +181,20 @@ export default function TopNav() {
         
         <div className="flex flex-wrap gap-2 items-center">
           <ImportDialog
-            onImportRendas={(rendas) => addRendas(rendas)}
-            onImportDividas={(dividas) => addDividas(dividas)}
-            onImportFaturaCartao={(cartaoId, dividas, parcelamentos) => {
-              if (dividas && dividas.length) addDividas(dividas);
-              if (parcelamentos && parcelamentos.length) parcelamentos.forEach(p => addParcelamento(p));
+            onImportRendas={async (rendas) => {
+              await addRendas(rendas);
+            }}
+            onImportDividas={async (dividas) => {
+              await addDividas(dividas);
+            }}
+            onImportFaturaCartao={async (cartaoId, dividas, parcelamentos) => {
+              if (dividas && dividas.length) await addDividas(dividas);
+              if (parcelamentos && parcelamentos.length) {
+                for (const p of parcelamentos) {
+                  // eslint-disable-next-line no-await-in-loop
+                  await addParcelamento(p);
+                }
+              }
             }}
             cartoes={cartoes}
           />
@@ -201,6 +241,18 @@ export default function TopNav() {
               Cofrinhos
             </Button>
           </Link>
+          <Link to="/profile">
+            <Button variant="outline" size="sm">
+              Meu Perfil
+            </Button>
+          </Link>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleLogout}
+          >
+            Sair
+          </Button>
         </div>
       </div>
     </header>

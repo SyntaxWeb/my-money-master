@@ -1,13 +1,110 @@
-import { useState, useEffect } from 'react';
-import { Renda, Divida, BalancoMensal, ComparativoMensal, Insight, Cartao, Parcelamento, Cofrinho } from '@/types/finance';
+import { useEffect, useState } from 'react';
+import {
+  BalancoMensal,
+  Cartao,
+  Cofrinho,
+  ComparativoMensal,
+  Divida,
+  Insight,
+  Parcelamento,
+  Renda,
+} from '@/types/finance';
+import { apiRequest } from '@/lib/api';
 
-const STORAGE_KEYS = {
-  RENDAS: 'finance_rendas',
-  DIVIDAS: 'finance_dividas',
-  CARTOES: 'finance_cartoes',
-  PARCELAMENTOS: 'finance_parcelamentos',
-  COFRINHOS: 'finance_cofrinhos',
+type RendaApi = {
+  id: number;
+  mes: string;
+  valor: number | string;
+  origem: string;
+  data: string;
 };
+
+type DividaApi = {
+  id: number;
+  mes: string;
+  valor: number | string;
+  motivo: string;
+  categoria: Divida['categoria'];
+  data: string;
+  status: Divida['status'];
+  cartao_id?: number | null;
+  parcelamento_id?: number | null;
+};
+
+type CartaoApi = {
+  id: number;
+  nome: string;
+  bandeira: string;
+  limite: number | string;
+  dia_fechamento: number;
+  dia_vencimento: number;
+};
+
+type ParcelamentoApi = {
+  id: number;
+  cartao_id: number;
+  descricao: string;
+  valor_total: number | string;
+  numero_parcelas: number;
+  parcela_atual: number;
+  mes_inicio: string;
+};
+
+type CofrinhoApi = {
+  id: number;
+  nome: string;
+  descricao?: string | null;
+  saldo: number | string;
+  created_at?: string;
+};
+
+const mapRenda = (r: RendaApi): Renda => ({
+  id: String(r.id),
+  mes: r.mes,
+  valor: Number(r.valor),
+  origem: r.origem,
+  data: r.data,
+});
+
+const mapDivida = (d: DividaApi): Divida => ({
+  id: String(d.id),
+  mes: d.mes,
+  valor: Number(d.valor),
+  motivo: d.motivo,
+  categoria: d.categoria,
+  data: d.data,
+  status: d.status,
+  cartaoId: d.cartao_id ? String(d.cartao_id) : undefined,
+  parcelamentoId: d.parcelamento_id ? String(d.parcelamento_id) : undefined,
+});
+
+const mapCartao = (c: CartaoApi): Cartao => ({
+  id: String(c.id),
+  nome: c.nome,
+  bandeira: c.bandeira,
+  limite: Number(c.limite),
+  diaFechamento: c.dia_fechamento,
+  diaVencimento: c.dia_vencimento,
+});
+
+const mapParcelamento = (p: ParcelamentoApi): Parcelamento => ({
+  id: String(p.id),
+  cartaoId: String(p.cartao_id),
+  descricao: p.descricao,
+  valorTotal: Number(p.valor_total),
+  numeroParcelas: p.numero_parcelas,
+  parcelaAtual: p.parcela_atual,
+  mesInicio: p.mes_inicio,
+  categoria: 'cartao',
+});
+
+const mapCofrinho = (c: CofrinhoApi): Cofrinho => ({
+  id: String(c.id),
+  nome: c.nome,
+  descricao: c.descricao ?? undefined,
+  saldo: Number(c.saldo),
+  criadoEm: c.created_at ?? undefined,
+});
 
 export const useFinanceData = () => {
   const [rendas, setRendas] = useState<Renda[]>([]);
@@ -17,190 +114,190 @@ export const useFinanceData = () => {
   const [cofrinhos, setCofrinhos] = useState<Cofrinho[]>([]);
 
   useEffect(() => {
-    const storedRendas = localStorage.getItem(STORAGE_KEYS.RENDAS);
-    const storedDividas = localStorage.getItem(STORAGE_KEYS.DIVIDAS);
-    const storedCartoes = localStorage.getItem(STORAGE_KEYS.CARTOES);
-    const storedParcelamentos = localStorage.getItem(STORAGE_KEYS.PARCELAMENTOS);
-    const storedCofrinhos = localStorage.getItem(STORAGE_KEYS.COFRINHOS);
+    const loadAll = async () => {
+      try {
+        const [rendasData, dividasData, cartoesData, parcelamentosData, cofrinhosData] = await Promise.all([
+          apiRequest<RendaApi[]>('/rendas'),
+          apiRequest<DividaApi[]>('/dividas'),
+          apiRequest<CartaoApi[]>('/cartoes'),
+          apiRequest<ParcelamentoApi[]>('/parcelamentos'),
+          apiRequest<CofrinhoApi[]>('/cofrinhos'),
+        ]);
 
-    if (storedRendas) setRendas(JSON.parse(storedRendas));
-    if (storedDividas) setDividas(JSON.parse(storedDividas));
-    if (storedCartoes) setCartoes(JSON.parse(storedCartoes));
-    if (storedParcelamentos) setParcelamentos(JSON.parse(storedParcelamentos));
-    if (storedCofrinhos) setCofrinhos(JSON.parse(storedCofrinhos));
+        setRendas(rendasData.map(mapRenda));
+        setDividas(dividasData.map(mapDivida));
+        setCartoes(cartoesData.map(mapCartao));
+        setParcelamentos(parcelamentosData.map(mapParcelamento));
+        setCofrinhos(cofrinhosData.map(mapCofrinho));
+      } catch (error) {
+        console.error('Erro ao carregar dados financeiros da API', error);
+      }
+    };
+
+    void loadAll();
   }, []);
 
-  const saveRendas = (newRendas: Renda[]) => {
-    setRendas(newRendas);
-    localStorage.setItem(STORAGE_KEYS.RENDAS, JSON.stringify(newRendas));
-  };
-
-  const saveDividas = (newDividas: Divida[]) => {
-    setDividas(newDividas);
-    localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(newDividas));
-  };
-
-  const saveCofrinhos = (newCofrinhos: Cofrinho[]) => {
-    setCofrinhos(newCofrinhos);
-    localStorage.setItem(STORAGE_KEYS.COFRINHOS, JSON.stringify(newCofrinhos));
-  };
-
-  const addRenda = (renda: Omit<Renda, 'id'>) => {
-    const newRenda = { ...renda, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
-    setRendas((prev) => {
-      const next = [...prev, newRenda];
-      localStorage.setItem(STORAGE_KEYS.RENDAS, JSON.stringify(next));
-      return next;
+  // RENDAS
+  const addRenda = async (renda: Omit<Renda, 'id'>) => {
+    const created = await apiRequest<RendaApi>('/rendas', 'POST', {
+      mes: renda.mes,
+      valor: renda.valor,
+      origem: renda.origem,
+      data: renda.data,
     });
+    setRendas((prev) => [...prev, mapRenda(created)]);
   };
 
-  const addDivida = (divida: Omit<Divida, 'id'>) => {
-    const newDivida = { ...divida, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
-    setDividas((prev) => {
-      const next = [...prev, newDivida];
-      localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(next));
-      return next;
+  const addRendas = async (rendasToAdd: Omit<Renda, 'id'>[]) => {
+    for (const r of rendasToAdd) {
+      // eslint-disable-next-line no-await-in-loop
+      await addRenda(r);
+    }
+  };
+
+  const deleteRenda = async (id: string) => {
+    await apiRequest(`/rendas/${id}`, 'DELETE');
+    setRendas((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  // DIVIDAS
+  const addDivida = async (divida: Omit<Divida, 'id'>) => {
+    const created = await apiRequest<DividaApi>('/dividas', 'POST', {
+      mes: divida.mes,
+      valor: divida.valor,
+      motivo: divida.motivo,
+      categoria: divida.categoria,
+      data: divida.data,
+      status: divida.status,
+      cartao_id: divida.cartaoId ? Number(divida.cartaoId) : undefined,
+      parcelamento_id: divida.parcelamentoId ? Number(divida.parcelamentoId) : undefined,
     });
+    setDividas((prev) => [...prev, mapDivida(created)]);
   };
 
-  // Bulk add methods
-  const addRendas = (rendasToAdd: Omit<Renda, 'id'>[]) => {
-    setRendas((prev) => {
-      const newItems = rendasToAdd.map((r) => ({
-        ...r,
-        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
-      }));
-      const next = [...prev, ...newItems];
-      localStorage.setItem(STORAGE_KEYS.RENDAS, JSON.stringify(next));
-      return next;
+  const addDividas = async (dividasToAdd: Omit<Divida, 'id'>[]) => {
+    for (const d of dividasToAdd) {
+      // eslint-disable-next-line no-await-in-loop
+      await addDivida(d);
+    }
+  };
+
+  const updateDivida = async (id: string, updates: Partial<Divida>) => {
+    const updated = await apiRequest<DividaApi>(`/dividas/${id}`, 'PATCH', {
+      mes: updates.mes,
+      valor: updates.valor,
+      motivo: updates.motivo,
+      categoria: updates.categoria,
+      data: updates.data,
+      status: updates.status,
+      cartao_id: updates.cartaoId ? Number(updates.cartaoId) : undefined,
+      parcelamento_id: updates.parcelamentoId ? Number(updates.parcelamentoId) : undefined,
     });
+    setDividas((prev) => prev.map((d) => (d.id === id ? mapDivida(updated) : d)));
   };
 
-  const addDividas = (dividasToAdd: Omit<Divida, 'id'>[]) => {
-    setDividas((prev) => {
-      const newItems = dividasToAdd.map((d) => ({
-        ...d,
-        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
-      }));
-      const next = [...prev, ...newItems];
-      localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(next));
-      return next;
+  const deleteDivida = async (id: string) => {
+    await apiRequest(`/dividas/${id}`, 'DELETE');
+    setDividas((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  // CARTOES
+  const addCartao = async (cartao: Omit<Cartao, 'id'>) => {
+    const created = await apiRequest<CartaoApi>('/cartoes', 'POST', {
+      nome: cartao.nome,
+      bandeira: cartao.bandeira,
+      limite: cartao.limite,
+      dia_fechamento: cartao.diaFechamento,
+      dia_vencimento: cartao.diaVencimento,
     });
+    setCartoes((prev) => [...prev, mapCartao(created)]);
   };
 
-  const updateDivida = (id: string, updates: Partial<Divida>) => {
-    const updated = dividas.map(d => d.id === id ? { ...d, ...updates } : d);
-    saveDividas(updated);
+  const updateCartao = async (id: string, updates: Partial<Cartao>) => {
+    const updated = await apiRequest<CartaoApi>(`/cartoes/${id}`, 'PATCH', {
+      nome: updates.nome,
+      bandeira: updates.bandeira,
+      limite: updates.limite,
+      dia_fechamento: updates.diaFechamento,
+      dia_vencimento: updates.diaVencimento,
+    });
+    setCartoes((prev) => prev.map((c) => (c.id === id ? mapCartao(updated) : c)));
   };
 
-  const deleteDivida = (id: string) => {
-    saveDividas(dividas.filter(d => d.id !== id));
+  const deleteCartao = async (id: string) => {
+    await apiRequest(`/cartoes/${id}`, 'DELETE');
+    setCartoes((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const deleteRenda = (id: string) => {
-    saveRendas(rendas.filter(r => r.id !== id));
-  };
-
-  // Cartões
-  const addCartao = (cartao: Omit<Cartao, 'id'>) => {
-    const newCartao = { ...cartao, id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9) };
-    const updated = [...cartoes, newCartao];
-    setCartoes(updated);
-    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(updated));
-  };
-
-  const updateCartao = (id: string, updates: Partial<Cartao>) => {
-    const updated = cartoes.map(c => c.id === id ? { ...c, ...updates } : c);
-    setCartoes(updated);
-    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(updated));
-  };
-
-  const deleteCartao = (id: string) => {
-    setCartoes(cartoes.filter(c => c.id !== id));
-    localStorage.setItem(STORAGE_KEYS.CARTOES, JSON.stringify(cartoes.filter(c => c.id !== id)));
-  };
-
-  // Parcelamentos
-  const addParcelamento = (parcelamento: Omit<Parcelamento, 'id'>) => {
+  // PARCELAMENTOS
+  const addParcelamento = async (parcelamento: Omit<Parcelamento, 'id'>) => {
     // Verifica se já existe parcelamento igual
     const exists = parcelamentos.some(
-      p =>
+      (p) =>
         p.cartaoId === parcelamento.cartaoId &&
         p.descricao === parcelamento.descricao &&
         p.mesInicio === parcelamento.mesInicio &&
         p.valorTotal === parcelamento.valorTotal &&
-        p.numeroParcelas === parcelamento.numeroParcelas
+        p.numeroParcelas === parcelamento.numeroParcelas,
     );
 
     if (exists) return;
 
-    // Cria ID único
-    const newParcelamento = {
-      ...parcelamento,
-      id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
-    };
+    const created = await apiRequest<ParcelamentoApi>('/parcelamentos', 'POST', {
+      cartao_id: Number(parcelamento.cartaoId),
+      descricao: parcelamento.descricao,
+      valor_total: parcelamento.valorTotal,
+      numero_parcelas: parcelamento.numeroParcelas,
+      parcela_atual: parcelamento.parcelaAtual,
+      mes_inicio: parcelamento.mesInicio,
+    });
 
-    const updated = [...parcelamentos, newParcelamento];
-    setParcelamentos(updated);
-    localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(updated));
+    const newParcelamento = mapParcelamento(created);
+    setParcelamentos((prev) => [...prev, newParcelamento]);
 
-    // VINCULAR parcela atual à dívida do mês atual
+    // Vincular parcela atual à dívida do mês atual
     try {
-      const currentIndex = (parcelamento.parcelaAtual - 1); // 0-based
+      const currentIndex = parcelamento.parcelaAtual - 1; // 0-based
       const [startAno, startMes] = parcelamento.mesInicio.split('-').map(Number);
 
-      const currDateObj = new Date(startAno, (startMes - 1) + currentIndex, 1);
+      const currDateObj = new Date(startAno, startMes - 1 + currentIndex, 1);
       const currMesStr = `${currDateObj.getFullYear()}-${String(currDateObj.getMonth() + 1).padStart(2, '0')}`;
 
-      setDividas(prev => {
-        const mutated = prev.map(d => {
-          if (
-            d.cartaoId === parcelamento.cartaoId &&
-            d.mes === currMesStr &&
-            d.motivo?.includes(parcelamento.descricao)
-          ) {
+      setDividas((prev) =>
+        prev.map((d) => {
+          if (d.cartaoId === parcelamento.cartaoId && d.mes === currMesStr && d.motivo?.includes(parcelamento.descricao)) {
             return { ...d, parcelamentoId: newParcelamento.id };
           }
           return d;
-        });
-        localStorage.setItem(STORAGE_KEYS.DIVIDAS, JSON.stringify(mutated));
-        return mutated;
-      });
-    } catch { }
+        }),
+      );
+    } catch {
+      // ignore
+    }
 
-    // Criar dívidas FUTURAS
+    // Criar dívidas futuras das parcelas
     const valorParcelaBase = parcelamento.valorTotal / parcelamento.numeroParcelas;
     const novasDividas: Omit<Divida, 'id'>[] = [];
 
-    // Mês da PRIMEIRA parcela (não é o mês da compra)
     const [anoCompra, mesCompra] = parcelamento.mesInicio.split('-').map(Number);
 
+    // Parcela atual
+    const pAtual = parcelamento.parcelaAtual;
+    const diffAtual = pAtual;
+    const dataAtual = new Date(anoCompra, mesCompra - 1 + diffAtual, 1);
+    const mesParcelaAtual = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, '0')}`;
 
-    // Criar parcelas FUTURAS:
-    // ParcelaAtual = mêsAtual
-    // Parcela p → mês = mesInicio + (p - 1)
-    const p = parcelamento.parcelaAtual;
-
-    const diff = p; // diferença desde o mês da compra (já corrigido)
-    const dataObj = new Date(anoCompra, (mesCompra - 1) + diff, 1);
-
-    const mesParcelaAtual = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
-
-    // verificar se já existe para este mês
     const existsInCurrentMonth = dividas.some(
-      d =>
-        d.cartaoId === parcelamento.cartaoId &&
-        d.mes === mesParcelaAtual &&
-        d.motivo?.includes(parcelamento.descricao)
+      (d) => d.cartaoId === parcelamento.cartaoId && d.mes === mesParcelaAtual && d.motivo?.includes(parcelamento.descricao),
     );
 
     if (!existsInCurrentMonth) {
       novasDividas.push({
         mes: mesParcelaAtual,
         valor: Number(valorParcelaBase.toFixed(2)),
-        motivo: `${parcelamento.descricao} (${p}/${parcelamento.numeroParcelas})`,
+        motivo: `${parcelamento.descricao} (${pAtual}/${parcelamento.numeroParcelas})`,
         categoria: 'cartao',
-        data: dataObj.toISOString().split('T')[0],
+        data: dataAtual.toISOString().split('T')[0],
         status: 'aberta',
         cartaoId: parcelamento.cartaoId,
         parcelamentoId: newParcelamento.id,
@@ -208,18 +305,10 @@ export const useFinanceData = () => {
     }
 
     for (let p = parcelamento.parcelaAtual + 1; p <= parcelamento.numeroParcelas; p++) {
-
-      // diferença desde a compra
-      const diff = p; // ← ALTERADO (p e não p-1)
-
-      // mês REAL da parcela:
-      // compra + 1 mês para a primeira parcela
-      const dataObj = new Date(anoCompra, (mesCompra - 1) + diff, 1);
-
-
+      const diff = p;
+      const dataObj = new Date(anoCompra, mesCompra - 1 + diff, 1);
       const mesParcela = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`;
 
-      // último recebe diferença do arredondamento
       const isLast = p === parcelamento.numeroParcelas;
       const valor = isLast
         ? Number((parcelamento.valorTotal - valorParcelaBase * (parcelamento.numeroParcelas - 1)).toFixed(2))
@@ -237,48 +326,46 @@ export const useFinanceData = () => {
       });
     }
 
-    // console.log('Novas dívidas geradas pelo parcelamento:', novasDividas);
-    // return
-
-    // Adicionar dívidas geradas
-    addDividas(novasDividas);
+    await addDividas(novasDividas);
   };
 
-
-  const deleteParcelamento = (id: string) => {
-    setParcelamentos(parcelamentos.filter(p => p.id !== id));
-    localStorage.setItem(STORAGE_KEYS.PARCELAMENTOS, JSON.stringify(parcelamentos.filter(p => p.id !== id)));
+  const deleteParcelamento = async (id: string) => {
+    await apiRequest(`/parcelamentos/${id}`, 'DELETE');
+    setParcelamentos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Cofrinhos (savings jars)
-  const addCofrinho = (cofrinho: Omit<Cofrinho, 'id' | 'criadoEm'>, initialDeposit = 0, mes?: string): boolean => {
-    const newCofrinho: Cofrinho = {
-      ...cofrinho,
-      id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 9),
-      criadoEm: new Date().toISOString(),
-      saldo: Number(((cofrinho.saldo || 0) + initialDeposit).toFixed(2)),
-    };
-
+  // COFRINHOS
+  const addCofrinho = async (
+    cofrinho: Omit<Cofrinho, 'id' | 'criadoEm'>,
+    initialDeposit = 0,
+    mes?: string,
+  ): Promise<boolean> => {
     const targetMes = mes || new Date().toISOString().slice(0, 7);
     const bal = getBalancoMensal(targetMes);
-    // If initial deposit is greater than current monthly balance, prevent deposit
-    if (initialDeposit && initialDeposit > 0) {
-      if (initialDeposit > bal.saldoMes) {
-        // create cofrinho, but without deposit
-        const updated = [...cofrinhos, { ...newCofrinho, saldo: 0 }];
-        saveCofrinhos(updated);
-        return false;
-      }
+
+    if (initialDeposit && initialDeposit > 0 && initialDeposit > bal.saldoMes) {
+      const created = await apiRequest<CofrinhoApi>('/cofrinhos', 'POST', {
+        nome: cofrinho.nome,
+        descricao: cofrinho.descricao,
+        saldo: 0,
+      });
+      setCofrinhos((prev) => [...prev, mapCofrinho(created)]);
+      return false;
     }
 
-    const updated = [...cofrinhos, newCofrinho];
-    saveCofrinhos(updated);
+    const created = await apiRequest<CofrinhoApi>('/cofrinhos', 'POST', {
+      nome: cofrinho.nome,
+      descricao: cofrinho.descricao,
+      saldo: Number(((cofrinho.saldo || 0) + initialDeposit).toFixed(2)),
+    });
+
+    setCofrinhos((prev) => [...prev, mapCofrinho(created)]);
 
     if (initialDeposit && initialDeposit > 0) {
-      addDivida({
+      await addDivida({
         mes: targetMes,
         valor: Number(initialDeposit.toFixed(2)),
-        motivo: `Transfer to cofrinho: ${newCofrinho.nome}`,
+        motivo: `Transfer to cofrinho: ${cofrinho.nome}`,
         categoria: 'outro',
         data: new Date().toISOString().split('T')[0],
         status: 'aberta',
@@ -288,28 +375,37 @@ export const useFinanceData = () => {
     return true;
   };
 
-  const updateCofrinho = (id: string, updates: Partial<Cofrinho>) => {
-    const updated = cofrinhos.map(c => c.id === id ? { ...c, ...updates } : c);
-    saveCofrinhos(updated);
+  const updateCofrinho = async (id: string, updates: Partial<Cofrinho>) => {
+    const existing = cofrinhos.find((c) => c.id === id);
+    if (!existing) return;
+
+    const updated = await apiRequest<CofrinhoApi>(`/cofrinhos/${id}`, 'PATCH', {
+      nome: updates.nome ?? existing.nome,
+      descricao: updates.descricao ?? existing.descricao,
+      saldo: updates.saldo ?? existing.saldo,
+    });
+
+    setCofrinhos((prev) => prev.map((c) => (c.id === id ? mapCofrinho(updated) : c)));
   };
 
-  const deleteCofrinho = (id: string) => {
-    saveCofrinhos(cofrinhos.filter(c => c.id !== id));
+  const deleteCofrinho = async (id: string) => {
+    await apiRequest(`/cofrinhos/${id}`, 'DELETE');
+    setCofrinhos((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const depositToCofrinho = (id: string, amount: number, mes?: string): boolean => {
+  const depositToCofrinho = async (id: string, amount: number, mes?: string): Promise<boolean> => {
     if (amount <= 0) return false;
     const targetMes = mes || new Date().toISOString().slice(0, 7);
     const bal = getBalancoMensal(targetMes);
-    // If user tries to deposit more than the available monthly saldo, prevent the operation
+
     if (amount > bal.saldoMes) {
       return false;
     }
-    const c = cofrinhos.find(c => c.id === id);
-    if (!c) return;
 
-    // Create expense entry to reflect money out
-    addDivida({
+    const c = cofrinhos.find((x) => x.id === id);
+    if (!c) return false;
+
+    await addDivida({
       mes: targetMes,
       valor: Number(amount.toFixed(2)),
       motivo: `Transfer to cofrinho: ${c.nome}`,
@@ -318,32 +414,38 @@ export const useFinanceData = () => {
       status: 'aberta',
     });
 
-    // Update cofrinho balance
-    updateCofrinho(id, { saldo: Number((c.saldo + amount).toFixed(2)) });
+    await updateCofrinho(id, { saldo: Number((c.saldo + amount).toFixed(2)) });
     return true;
   };
 
-  const withdrawFromCofrinho = (id: string, amount: number, mes?: string) => {
+  const withdrawFromCofrinho = async (id: string, amount: number, mes?: string) => {
     if (amount <= 0) return;
-    const c = cofrinhos.find(c => c.id === id);
+    const c = cofrinhos.find((x) => x.id === id);
     if (!c) return;
     if (amount > c.saldo) return;
     const targetMes = mes || new Date().toISOString().slice(0, 7);
 
-    // create renda to reflect money returned to month
-    addRenda({
+    await addRenda({
       mes: targetMes,
       valor: Number(amount.toFixed(2)),
       origem: `Cofrinho: ${c.nome}`,
       data: new Date().toISOString().split('T')[0],
     });
 
-    // update cofrinho saldo
-    updateCofrinho(id, { saldo: Number((c.saldo - amount).toFixed(2)) });
+    await updateCofrinho(id, { saldo: Number((c.saldo - amount).toFixed(2)) });
   };
 
   const getParcelamentosByCartao = (cartaoId: string) => {
-    return parcelamentos.filter(p => p.cartaoId === cartaoId);
+    return parcelamentos.filter((p) => p.cartaoId === cartaoId);
+  };
+
+  const getMesesDisponiveis = (): string[] => {
+    const meses = new Set<string>();
+    rendas.forEach((r) => meses.add(r.mes));
+    dividas.forEach((d) => meses.add(d.mes));
+    const resultado = Array.from(meses).sort().reverse();
+    console.log('Meses disponíveis:', resultado);
+    return resultado;
   };
 
   const getSaldoAcumuladoAteOMes = (mesAlvo: string): number => {
@@ -355,11 +457,11 @@ export const useFinanceData = () => {
     let saldoAcumulado = 0;
     for (let i = 0; i <= indiceMesAlvo; i++) {
       const mes = mesesOrdenados[i];
-      const rendasMes = rendas.filter(r => r.mes === mes);
-      const dividasMes = dividas.filter(d => d.mes === mes);
+      const rendasMes = rendas.filter((r) => r.mes === mes);
+      const dividasMes = dividas.filter((d) => d.mes === mes);
       const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
       const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
-      saldoAcumulado += (totalRenda - totalDivida);
+      saldoAcumulado += totalRenda - totalDivida;
     }
 
     return saldoAcumulado;
@@ -367,11 +469,11 @@ export const useFinanceData = () => {
 
   const getBalancoMensal = (mes: string): BalancoMensal => {
     console.log('getBalancoMensal - mes:', mes);
-    const rendasMes = rendas.filter(r => r.mes === mes);
-    const dividasMes = dividas.filter(d => d.mes === mes);
+    const rendasMes = rendas.filter((r) => r.mes === mes);
+    const dividasMes = dividas.filter((d) => d.mes === mes);
     console.log('Rendas encontradas:', rendasMes.length, 'Dividas encontradas:', dividasMes.length);
-    rendasMes.forEach(r => console.log('Renda:', r.mes, r.origem, r.valor));
-    dividasMes.forEach(d => console.log('Divida:', d.mes, d.motivo, d.valor));
+    rendasMes.forEach((r) => console.log('Renda:', r.mes, r.origem, r.valor));
+    dividasMes.forEach((d) => console.log('Divida:', d.mes, d.motivo, d.valor));
 
     const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
     const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
@@ -379,10 +481,10 @@ export const useFinanceData = () => {
     const saldoAcumulado = getSaldoAcumuladoAteOMes(mes);
 
     const gastosPorCategoria = {
-      cartao: dividasMes.filter(d => d.categoria === 'cartao').reduce((sum, d) => sum + d.valor, 0),
-      fixa: dividasMes.filter(d => d.categoria === 'fixa').reduce((sum, d) => sum + d.valor, 0),
-      variavel: dividasMes.filter(d => d.categoria === 'variavel').reduce((sum, d) => sum + d.valor, 0),
-      outro: dividasMes.filter(d => d.categoria === 'outro').reduce((sum, d) => sum + d.valor, 0),
+      cartao: dividasMes.filter((d) => d.categoria === 'cartao').reduce((sum, d) => sum + d.valor, 0),
+      fixa: dividasMes.filter((d) => d.categoria === 'fixa').reduce((sum, d) => sum + d.valor, 0),
+      variavel: dividasMes.filter((d) => d.categoria === 'variavel').reduce((sum, d) => sum + d.valor, 0),
+      outro: dividasMes.filter((d) => d.categoria === 'outro').reduce((sum, d) => sum + d.valor, 0),
     };
 
     return {
@@ -411,7 +513,11 @@ export const useFinanceData = () => {
 
     const padroes: string[] = [];
     if (Math.abs(diferencaGastos) > balancoAnterior.totalDivida * 0.15) {
-      padroes.push(`Gastos ${diferencaGastos > 0 ? 'subiram' : 'caíram'} ${Math.abs(((diferencaGastos / balancoAnterior.totalDivida) * 100)).toFixed(1)}%`);
+      padroes.push(
+        `Gastos ${diferencaGastos > 0 ? 'subiram' : 'caíram'} ${Math.abs(
+          ((diferencaGastos / balancoAnterior.totalDivida) * 100),
+        ).toFixed(1)}%`,
+      );
     }
     if (Math.abs(diferencaCartao) > balancoAnterior.gastosPorCategoria.cartao * 0.2) {
       padroes.push(`Cartão ${diferencaCartao > 0 ? 'aumentou' : 'diminuiu'} significativamente`);
@@ -436,7 +542,9 @@ export const useFinanceData = () => {
     if (balanco.porcentagemComprometida > 80) {
       insights.push({
         tipo: 'alerta',
-        mensagem: `Você está comprometendo ${balanco.porcentagemComprometida.toFixed(1)}% da sua renda. Considere reduzir gastos variáveis.`,
+        mensagem: `Você está comprometendo ${balanco.porcentagemComprometida.toFixed(
+          1,
+        )}% da sua renda. Considere reduzir gastos variáveis.`,
       });
     }
 
@@ -464,27 +572,22 @@ export const useFinanceData = () => {
     if (balanco.saldoAcumulado < 0) {
       insights.push({
         tipo: 'alerta',
-        mensagem: `Atenção! Seu saldo acumulado está negativo em R$ ${Math.abs(balanco.saldoAcumulado).toFixed(2)}. Revise seus gastos urgentemente.`,
+        mensagem: `Atenção! Seu saldo acumulado está negativo em R$ ${Math.abs(
+          balanco.saldoAcumulado,
+        ).toFixed(2)}. Revise seus gastos urgentemente.`,
       });
     }
 
     if (balanco.saldoAcumulado > balanco.totalRenda * 3) {
       insights.push({
         tipo: 'parabens',
-        mensagem: `Excelente! Você já acumulou R$ ${balanco.saldoAcumulado.toFixed(2)}. Considere investir parte desse valor.`,
+        mensagem: `Excelente! Você já acumulou R$ ${balanco.saldoAcumulado.toFixed(
+          2,
+        )}. Considere investir parte desse valor.`,
       });
     }
 
     return insights;
-  };
-
-  const getMesesDisponiveis = (): string[] => {
-    const meses = new Set<string>();
-    rendas.forEach(r => meses.add(r.mes));
-    dividas.forEach(d => meses.add(d.mes));
-    const resultado = Array.from(meses).sort().reverse();
-    console.log('Meses disponíveis:', resultado);
-    return resultado;
   };
 
   return {
@@ -517,3 +620,4 @@ export const useFinanceData = () => {
     getMesesDisponiveis,
   };
 };
+

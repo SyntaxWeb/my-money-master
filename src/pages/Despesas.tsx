@@ -24,7 +24,7 @@ export default function Despesas() {
     data: new Date().toISOString().slice(0, 10),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.valor || !formData.motivo) {
       toast.error('Preencha todos os campos obrigatórios');
@@ -46,7 +46,7 @@ export default function Despesas() {
       const valorParcela = parseFloat(formData.valor);
       const motivoComParcela = `${formData.motivo} (${parcelaAtual}/${numeroParcelas})`;
 
-      addDivida({
+      await addDivida({
         mes: formData.mes,
         valor: valorParcela,
         motivo: motivoComParcela,
@@ -66,7 +66,7 @@ export default function Despesas() {
       const mesInicio = subtractMonthsStr(formData.mes, parcelaAtual - 1);
       const valorTotal = Number((valorParcela * numeroParcelas).toFixed(2));
 
-      addParcelamento({
+      await addParcelamento({
         cartaoId: formData.cartaoId,
         descricao: String(formData.motivo).trim(),
         valorTotal,
@@ -92,7 +92,7 @@ export default function Despesas() {
     }
 
     // Default add single divida
-    addDivida({
+    await addDivida({
       mes: formData.mes,
       valor: parseFloat(formData.valor),
       motivo: formData.motivo,
@@ -343,8 +343,8 @@ export default function Despesas() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              updateDivida(divida.id, {
+                            onClick={async () => {
+                              await updateDivida(divida.id, {
                                 status: divida.status === 'paga' ? 'aberta' : 'paga'
                               });
                               toast.success(divida.status === 'paga' ? 'Marcada como aberta' : 'Marcada como paga');
@@ -359,8 +359,8 @@ export default function Despesas() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              deleteDivida(divida.id);
+                            onClick={async () => {
+                              await deleteDivida(divida.id);
                               toast.success('Despesa removida');
                             }}
                           >

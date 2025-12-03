@@ -32,7 +32,7 @@ const Cartoes = () => {
   const [numeroParcelas, setNumeroParcelas] = useState('');
   const [mesInicio, setMesInicio] = useState('');
 
-  const handleSubmitCartao = (e: React.FormEvent) => {
+  const handleSubmitCartao = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!nome || !bandeira || !limite || !diaFechamento || !diaVencimento) {
@@ -44,7 +44,7 @@ const Cartoes = () => {
       return;
     }
 
-    addCartao({
+    await addCartao({
       nome,
       bandeira,
       limite: parseFloat(limite),
@@ -64,7 +64,7 @@ const Cartoes = () => {
     });
   };
 
-  const handleSubmitParcelamento = (e: React.FormEvent) => {
+  const handleSubmitParcelamento = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!cartaoSelecionado || !descricao || !valorTotal || !numeroParcelas || !mesInicio) {
@@ -85,7 +85,7 @@ const Cartoes = () => {
       categoria: 'cartao',
     });
 
-    addParcelamento({
+    await addParcelamento({
       cartaoId: cartaoSelecionado,
       descricao,
       valorTotal: parseFloat(valorTotal),
@@ -309,7 +309,7 @@ const Cartoes = () => {
                               size="icon"
                               onClick={() => {
                                 if (confirm('Deseja excluir este cartão?')) {
-                                  deleteCartao(cartao.id);
+                                  void deleteCartao(cartao.id);
                                   toast({
                                     title: 'Cartão excluído',
                                     description: 'O cartão foi removido com sucesso.',

@@ -40,22 +40,23 @@ export default function Dashboard() {
   } = useFinanceData();
   const mesesDisponiveis = getMesesDisponiveis();
 
-  const handleImportRendas = (newRendas: any[]) => {
-    addRendas(newRendas);
+  const handleImportRendas = async (newRendas: any[]) => {
+    await addRendas(newRendas);
   };
 
-  const handleImportDividas = (newDividas: any[]) => {
-    addDividas(newDividas);
+  const handleImportDividas = async (newDividas: any[]) => {
+    await addDividas(newDividas);
   };
 
-  const handleImportFaturaCartao = (cartaoId: string, dividas: any[], parcelamentos: any[]) => {
+  const handleImportFaturaCartao = async (cartaoId: string, dividas: any[], parcelamentos: any[]) => {
     // Adicionar as dívidas
-    addDividas(dividas);
+    await addDividas(dividas);
 
     // Adicionar os parcelamentos (que vão criar as parcelas automaticamente)
-    parcelamentos.forEach(parc => {
-      addParcelamento(parc);
-    });
+    for (const parc of parcelamentos) {
+      // eslint-disable-next-line no-await-in-loop
+      await addParcelamento(parc);
+    }
   };
 
   const [mesSelecionado, setMesSelecionado] = useState(
