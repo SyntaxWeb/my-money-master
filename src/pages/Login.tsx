@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import logo from "@/assets/syntaxweb-logo.jpg";
-
-const API_BASE_URL = "http://localhost:4002/api";
+import { apiRequest } from "@/lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,27 +23,15 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const data = await apiRequest<{ token: string }>("/login", "POST", { email, password });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        toast.error(data?.message || "Erro ao fazer login");
-        return;
-      }
-
-      const data = await response.json();
       localStorage.setItem("auth_token", data.token);
       toast.success("Login realizado com sucesso");
       navigate("/app");
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível conectar ao servidor");
+      const message = error instanceof Error ? error.message : "Não foi possível conectar ao servidor";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
