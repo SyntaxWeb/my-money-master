@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function Despesas() {
-  const { dividas, addDivida, updateDivida, deleteDivida, cartoes, addParcelamento } = useFinanceData();
+  const { dividas, addDivida, addDividasFixas, updateDivida, deleteDivida, cartoes, addParcelamento } = useFinanceData();
   const [formData, setFormData] = useState({
     mes: new Date().toISOString().slice(0, 7),
     valor: '',
@@ -21,6 +21,7 @@ export default function Despesas() {
     tipoPagamento: 'avista' as 'avista' | 'parcelado',
     numeroParcelas: 1,
     parcelaAtual: 1,
+    numeroMeses: 1,
     data: new Date().toISOString().slice(0, 10),
   });
 
@@ -99,6 +100,37 @@ export default function Despesas() {
         tipoPagamento: 'avista',
         numeroParcelas: 1,
         parcelaAtual: 1,
+        numeroMeses: 1,
+        data: new Date().toISOString().slice(0, 10),
+      });
+      return;
+    }
+
+    if (formData.categoria === 'fixa' && Number(formData.numeroMeses) > 1) {
+      const numeroMeses = Number(formData.numeroMeses);
+      if (!numeroMeses || numeroMeses < 2) {
+        toast.error('Insira um número de meses válido (>= 2)');
+        return;
+      }
+      await addDividasFixas({
+        mesInicio: formData.mes,
+        numeroMeses,
+        valor: parseFloat(formData.valor),
+        motivo: formData.motivo,
+        data: formData.data,
+        status: 'aberta',
+      });
+      toast.success('Despesa fixa cadastrada e parcelas futuras geradas.');
+      setFormData({
+        mes: formData.mes,
+        valor: '',
+        motivo: '',
+        categoria: 'variavel',
+        cartaoId: '',
+        tipoPagamento: 'avista',
+        numeroParcelas: 1,
+        parcelaAtual: 1,
+        numeroMeses: 1,
         data: new Date().toISOString().slice(0, 10),
       });
       return;
@@ -124,6 +156,7 @@ export default function Despesas() {
       tipoPagamento: 'avista',
       numeroParcelas: 1,
       parcelaAtual: 1,
+      numeroMeses: 1,
       data: new Date().toISOString().slice(0, 10),
     });
   };
@@ -276,6 +309,21 @@ export default function Despesas() {
                       />
                     </div>
                   </>
+                )}
+                {formData.categoria === 'fixa' && (
+                  <div>
+                    <Label htmlFor="numeroMeses">Repetir por (meses)</Label>
+                    <Input
+                      id="numeroMeses"
+                      type="number"
+                      min={1}
+                      value={String(formData.numeroMeses)}
+                      onChange={(e) => setFormData({ ...formData, numeroMeses: Number(e.target.value) })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Defina por quantos meses a despesa fixa deve se repetir. Se for 1, será criada apenas no mês selecionado.
+                    </p>
+                  </div>
                 )}
                 {formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado' && (
                   <p className="text-sm text-muted-foreground md:col-span-2">Os lançamentos das próximas parcelas serão criados automaticamente no cartão selecionado.</p>

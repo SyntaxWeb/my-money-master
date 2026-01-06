@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://syntax-finance-api.syntaxweb.com.br/api";
+const DEFAULT_API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+
+if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.DEV) {
+  console.warn(`VITE_API_BASE_URL não definido, usando padrão: ${DEFAULT_API_BASE_URL}`);
+}
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -29,6 +34,12 @@ export async function apiRequest<T = unknown>(
       const data = await response.json();
       if (data && typeof data.message === "string") {
         message = data.message;
+      }
+      if (data && typeof data.errors === "object") {
+        const errors = Object.values(data.errors).flat().filter(Boolean);
+        if (errors.length) {
+          message = errors.join(" ");
+        }
       }
     } catch {
       // ignore parse error

@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import { FinanceDataProvider } from "@/hooks/useFinanceData";
 
 type RequireAuthProps = {
   children: JSX.Element;
@@ -107,9 +108,11 @@ const App = () => (
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
+        <FinanceDataProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </FinanceDataProvider>
       </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>

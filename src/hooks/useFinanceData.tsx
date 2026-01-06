@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   BalancoMensal,
   Cartao,
@@ -106,7 +106,7 @@ const mapCofrinho = (c: CofrinhoApi): Cofrinho => ({
   criadoEm: c.created_at ?? undefined,
 });
 
-export const useFinanceData = () => {
+const useFinanceDataInternal = () => {
   const [rendas, setRendas] = useState<Renda[]>([]);
   const [dividas, setDividas] = useState<Divida[]>([]);
   const [cartoes, setCartoes] = useState<Cartao[]>([]);
@@ -173,6 +173,25 @@ export const useFinanceData = () => {
       parcelamento_id: divida.parcelamentoId ? Number(divida.parcelamentoId) : undefined,
     });
     setDividas((prev) => [...prev, mapDivida(created)]);
+  };
+
+  const addDividasFixas = async (payload: {
+    mesInicio: string;
+    numeroMeses: number;
+    valor: number;
+    motivo: string;
+    data: string;
+    status?: Divida['status'];
+  }) => {
+    const created = await apiRequest<DividaApi[]>('/dividas/recorrentes', 'POST', {
+      mes_inicio: payload.mesInicio,
+      numero_meses: payload.numeroMeses,
+      valor: payload.valor,
+      motivo: payload.motivo,
+      data: payload.data,
+      status: payload.status ?? 'aberta',
+    });
+    setDividas((prev) => [...prev, ...created.map(mapDivida)]);
   };
 
   const addDividas = async (dividasToAdd: Omit<Divida, 'id'>[]) => {
@@ -490,7 +509,6 @@ export const useFinanceData = () => {
     rendas.forEach((r) => meses.add(r.mes));
     dividas.forEach((d) => meses.add(d.mes));
     const resultado = Array.from(meses).sort().reverse();
-    console.log('Meses disponíveis:', resultado);
     return resultado;
   };
 
@@ -515,12 +533,8 @@ export const useFinanceData = () => {
   };
 
   const getBalancoMensal = (mes: string): BalancoMensal => {
-    console.log('getBalancoMensal - mes:', mes);
     const rendasMes = rendas.filter((r) => r.mes === mes);
     const dividasMes = dividas.filter((d) => d.mes === mes);
-    console.log('Rendas encontradas:', rendasMes.length, 'Dividas encontradas:', dividasMes.length);
-    rendasMes.forEach((r) => console.log('Renda:', r.mes, r.origem, r.valor));
-    dividasMes.forEach((d) => console.log('Divida:', d.mes, d.motivo, d.valor));
 
     const totalRenda = rendasMes.reduce((sum, r) => sum + r.valor, 0);
     const totalDivida = dividasMes.reduce((sum, d) => sum + d.valor, 0);
@@ -645,6 +659,7 @@ export const useFinanceData = () => {
     cofrinhos,
     addRenda,
     addDivida,
+    addDividasFixas,
     addRendas,
     addDividas,
     updateDivida,
@@ -666,4 +681,25 @@ export const useFinanceData = () => {
     getInsights,
     getMesesDisponiveis,
   };
+};
+
+type FinanceDataContextValue = ReturnType<typeof useFinanceDataInternal>;
+
+const FinanceDataContext = createContext<FinanceDataContextValue | null>(null);
+
+export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
+  const value = useFinanceDataInternal();
+  return (
+    <FinanceDataContext.Provider value={value}>
+      {children}
+    </FinanceDataContext.Provider>
+  );
+};
+
+export const useFinanceData = () => {
+  const context = useContext(FinanceDataContext);
+  if (!context) {
+    throw new Error('useFinanceData deve ser usado dentro de FinanceDataProvider');
+  }
+  return context;
 };
