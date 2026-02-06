@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Switch } from '@/components/ui/switch';
 import { exportToExcel } from '@/utils/exportToExcel';
-import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus, PiggyBank } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, Plus, PiggyBank, ChevronLeft, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import AdSlot from '@/components/ui/ad-slot';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { ImportDialog } from '@/components/ImportDialog';
 import CofrinhoPanel from '@/components/CofrinhoPanel';
@@ -39,6 +38,19 @@ export default function Dashboard() {
     getMesesDisponiveis
   } = useFinanceData();
   const mesesDisponiveis = getMesesDisponiveis();
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const mesesOrdenados = useMemo(() => {
+    const set = new Set(mesesDisponiveis);
+    set.add(currentMonth);
+    return Array.from(set).sort().reverse();
+  }, [mesesDisponiveis, currentMonth]);
+  const formatMesLabel = (mes: string) => {
+    const [ano, mesNum] = mes.split('-').map(Number);
+    if (!ano || !mesNum) return mes;
+    const data = new Date(ano, mesNum - 1, 1);
+    const label = data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
 
   const handleImportRendas = async (newRendas: any[]) => {
     await addRendas(newRendas);
@@ -59,9 +71,7 @@ export default function Dashboard() {
     }
   };
 
-  const [mesSelecionado, setMesSelecionado] = useState(
-    mesesDisponiveis[0] || new Date().toISOString().slice(0, 7)
-  );
+  const [mesSelecionado, setMesSelecionado] = useState(currentMonth);
   // chart UI states
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [rangeMonths, setRangeMonths] = useState<number>(6);
@@ -80,12 +90,39 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', update);
   }, []);
 
+  useEffect(() => {
+    if (!mesesOrdenados.includes(mesSelecionado)) {
+      setMesSelecionado(currentMonth);
+    }
+  }, [mesesOrdenados, mesSelecionado, currentMonth]);
 
-  const mesAnterior = mesesDisponiveis[mesesDisponiveis.indexOf(mesSelecionado) + 1];
+  const selectedIndex = mesesOrdenados.indexOf(mesSelecionado);
+  const canGoPrev = selectedIndex < mesesOrdenados.length - 1 && selectedIndex !== -1;
+  const canGoNext = selectedIndex > 0;
+  const isCurrentMonth = mesSelecionado === currentMonth;
+
+  const handleChangeMonth = (direction: 'prev' | 'next') => {
+    if (selectedIndex === -1) {
+      setMesSelecionado(currentMonth);
+      return;
+    }
+    const newIndex =
+      direction === 'prev'
+        ? Math.min(selectedIndex + 1, mesesOrdenados.length - 1)
+        : Math.max(selectedIndex - 1, 0);
+    if (newIndex !== selectedIndex) {
+      setMesSelecionado(mesesOrdenados[newIndex]);
+    }
+  };
+
+  const handleResetMonth = () => setMesSelecionado(currentMonth);
+
+
+  const mesAnterior = selectedIndex === -1 ? undefined : mesesOrdenados[selectedIndex + 1];
   const comparativo = mesAnterior ? getComparativo(mesSelecionado, mesAnterior) : null;
 
   const getRecentMonths = (n: number) => {
-    const sortedAsc = [...mesesDisponiveis].sort(); // YYYY-MM em ordem cronológica
+    const sortedAsc = [...mesesOrdenados].sort(); // YYYY-MM em ordem cronológica
     const idx = sortedAsc.indexOf(mesSelecionado);
     if (idx === -1) {
       // fallback: usa os últimos n meses disponíveis
@@ -167,33 +204,46 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard Financeiro</h1>
         </div>
 
-        {/* Top Banner Ad */}
-        <div className="py-3">
-          <AdSlot id="dashboard-top-banner" size="banner" />
-        </div>
-
         {/* Chart Controls */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between mt-4">
           <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-            <label htmlFor="mes-select" className="text-sm font-medium text-foreground">Mês:</label>
-            <select
-              value={mesSelecionado}
-              onChange={(e) => setMesSelecionado(e.target.value)}
-              id="mes-select"
-              className="px-3 py-2 border border-border rounded-md bg-background text-foreground w-full sm:w-auto"
-            >
-              {mesesDisponiveis.map(mes => (
-                <option key={mes} value={mes}>
-                  {(() => {
-                    const [ano, mesNum] = mes.split('-').map(Number);
-                    const data = new Date(ano, mesNum - 1, 1); // mês começa em 0
-                    const label = data.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
-                    // Capitalize the first letter for pt-BR months which are lowercase by default
-                    return label.charAt(0).toUpperCase() + label.slice(1);
-                  })()}
-                </option>
-              ))}
-            </select>
+            <label className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Mês de referência
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleChangeMonth('prev')}
+                disabled={!canGoPrev}
+                aria-label="Ver mês anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="px-4 py-2 border border-border rounded-md bg-background/80 text-foreground min-w-[170px] text-center">
+                {formatMesLabel(mesSelecionado)}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleChangeMonth('next')}
+                disabled={!canGoNext}
+                aria-label="Ver mês seguinte"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetMonth}
+                disabled={isCurrentMonth}
+                className="flex items-center gap-1"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Mês atual
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Período:</span>
@@ -326,12 +376,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Inline/Rectangle Ad */}
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <AdSlot id="dashboard-inline-rect" size="rectangle" />
-        </div>
-
         {comparativo && (
           <Card className="min-w-0">
             <CardHeader>
@@ -538,12 +582,9 @@ export default function Dashboard() {
           </Card>
         </div>
         <div className="mt-4 space-y-4">
-          <CofrinhoPanel />
-          <div>
-            <AdSlot id="dashboard-footer-small" size="small" />
+            <CofrinhoPanel />
           </div>
         </div>
-      </div>
-    </div >
+      </div >
   );
 }

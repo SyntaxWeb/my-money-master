@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import AdSlot from "@/components/ui/ad-slot";
 import { Link } from "react-router-dom";
 import {
   Wallet,
@@ -201,15 +200,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Top Banner Ad */}
-      <section className="container mx-auto px-4 py-4">
-        <AdSlot
-          id="top-banner"
-          size="banner"
-          className="h-12 md:h-20 lg:h-32"
-        />
-      </section>
-
       {/* How it works / passos práticos */}
       <section className="container mx-auto px-4 py-16">
         <div className="max-w-5xl mx-auto text-center mb-10">
@@ -256,17 +246,6 @@ const Landing = () => {
               <p className="text-muted-foreground">{feature.description}</p>
             </Card>
           ))}
-        </div>
-      </section>
-
-      {/* Middle Rectangle Ad */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <AdSlot
-            id="mid-rectangle"
-            size="rectangle"
-            className="h-20 md:h-36"
-          />
         </div>
       </section>
 
@@ -358,9 +337,6 @@ const Landing = () => {
             Desenvolvido por <strong>SyntaxWeb</strong> — soluções em
             desenvolvimento web e design.
           </p>
-          <div className="mt-4">
-            <AdSlot id="footer-small" size="small" className="h-8 md:h-12" />
-          </div>
         </div>
       </footer>
     </div>

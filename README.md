@@ -122,3 +122,9 @@ Exportar dados financeiros
 Gerenciar parcelamentos e faturas futuras
 
 Criado com ❤️ pela SyntaxWeb.
+### Login com Google
+
+1. No Google Cloud Console crie um OAuth Client ID para aplica??es web e copie o CLIENT_ID.
+2. Na API Laravel, defina GOOGLE_CLIENT_ID no arquivo .env e execute composer install para garantir a depend?ncia google/apiclient.
+3. No front-end defina VITE_GOOGLE_CLIENT_ID no .env (o mesmo client ID) e reinicie o 
+pm run dev.
