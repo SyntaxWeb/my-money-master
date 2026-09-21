@@ -17,6 +17,10 @@ type RendaApi = {
   valor: number | string;
   origem: string;
   data: string;
+  recurrence_group_id?: string | null;
+  is_recurring?: boolean;
+  recurrence_start_date?: string | null;
+  recurrence_end_date?: string | null;
 };
 
 type DividaApi = {
@@ -54,8 +58,19 @@ type CofrinhoApi = {
   id: number;
   nome: string;
   descricao?: string | null;
+  type?: Cofrinho['type'];
   saldo: number | string;
+  minimum_goal?: number | string | null;
+  target_goal?: number | string | null;
   created_at?: string;
+  movements?: Array<{
+    id: number;
+    type: 'DEPOSIT' | 'WITHDRAW';
+    amount: number | string;
+    description?: string | null;
+    movement_date: string;
+    month: string;
+  }>;
 };
 
 const mapRenda = (r: RendaApi): Renda => ({
@@ -64,6 +79,10 @@ const mapRenda = (r: RendaApi): Renda => ({
   valor: Number(r.valor),
   origem: r.origem,
   data: r.data,
+  recurrenceGroupId: r.recurrence_group_id ?? undefined,
+  isRecurring: Boolean(r.is_recurring),
+  recurrenceStartDate: r.recurrence_start_date ?? undefined,
+  recurrenceEndDate: r.recurrence_end_date ?? undefined,
 });
 
 const mapDivida = (d: DividaApi): Divida => ({
@@ -102,8 +121,19 @@ const mapCofrinho = (c: CofrinhoApi): Cofrinho => ({
   id: String(c.id),
   nome: c.nome,
   descricao: c.descricao ?? undefined,
+  type: c.type ?? 'GENERAL',
   saldo: Number(c.saldo),
+  minimumGoal: c.minimum_goal ? Number(c.minimum_goal) : undefined,
+  targetGoal: c.target_goal ? Number(c.target_goal) : undefined,
   criadoEm: c.created_at ?? undefined,
+  movements: (c.movements ?? []).map((movement) => ({
+    id: String(movement.id),
+    type: movement.type,
+    amount: Number(movement.amount),
+    description: movement.description ?? undefined,
+    movementDate: movement.movement_date,
+    month: movement.month,
+  })),
 });
 
 const useFinanceDataInternal = () => {
@@ -138,14 +168,34 @@ const useFinanceDataInternal = () => {
   }, []);
 
   // RENDAS
-  const addRenda = async (renda: Omit<Renda, 'id'>) => {
-    const created = await apiRequest<RendaApi>('/rendas', 'POST', {
+  const addRenda = async (renda: Omit<Renda, 'id'> & { recurrenceMonths?: number }) => {
+    const created = await apiRequest<RendaApi | RendaApi[]>('/rendas', 'POST', {
       mes: renda.mes,
       valor: renda.valor,
       origem: renda.origem,
       data: renda.data,
+      is_recurring: renda.isRecurring,
+      recurrence_months: renda.recurrenceMonths,
+      recurrence_end_date: renda.recurrenceEndDate,
     });
-    setRendas((prev) => [...prev, mapRenda(created)]);
+    const mapped = Array.isArray(created) ? created.map(mapRenda) : [mapRenda(created)];
+    setRendas((prev) => [...prev, ...mapped]);
+  };
+
+  const updateRenda = async (id: string, updates: Partial<Renda> & { futureOnly?: boolean }) => {
+    const updated = await apiRequest<RendaApi | RendaApi[]>(`/rendas/${id}`, 'PATCH', {
+      mes: updates.mes,
+      valor: updates.valor,
+      origem: updates.origem,
+      data: updates.data,
+      future_only: updates.futureOnly,
+    });
+    const mapped = Array.isArray(updated) ? updated.map(mapRenda) : [mapRenda(updated)];
+    setRendas((prev) => {
+      const byId = new Map(prev.map((item) => [item.id, item]));
+      mapped.forEach((item) => byId.set(item.id, item));
+      return Array.from(byId.values());
+    });
   };
 
   const addRendas = async (rendasToAdd: Omit<Renda, 'id'>[]) => {
@@ -406,35 +456,31 @@ const useFinanceDataInternal = () => {
     mes?: string,
   ): Promise<boolean> => {
     const targetMes = mes || new Date().toISOString().slice(0, 7);
-    const bal = getBalancoMensal(targetMes);
-
-    if (initialDeposit && initialDeposit > 0 && initialDeposit > bal.saldoMes) {
-      const created = await apiRequest<CofrinhoApi>('/cofrinhos', 'POST', {
-        nome: cofrinho.nome,
-        descricao: cofrinho.descricao,
-        saldo: 0,
-      });
-      setCofrinhos((prev) => [...prev, mapCofrinho(created)]);
-      return false;
-    }
 
     const created = await apiRequest<CofrinhoApi>('/cofrinhos', 'POST', {
       nome: cofrinho.nome,
       descricao: cofrinho.descricao,
-      saldo: Number(((cofrinho.saldo || 0) + initialDeposit).toFixed(2)),
+      type: cofrinho.type ?? 'GENERAL',
+      saldo: Number((cofrinho.saldo || 0).toFixed(2)),
+      minimum_goal: cofrinho.minimumGoal,
+      target_goal: cofrinho.targetGoal,
     });
 
     setCofrinhos((prev) => [...prev, mapCofrinho(created)]);
 
     if (initialDeposit && initialDeposit > 0) {
-      await addDivida({
-        mes: targetMes,
-        valor: Number(initialDeposit.toFixed(2)),
-        motivo: `Transfer to cofrinho: ${cofrinho.nome}`,
-        categoria: 'outro',
-        data: new Date().toISOString().split('T')[0],
-        status: 'aberta',
+      const result = await apiRequest<{ cofrinho: CofrinhoApi; expense?: DividaApi }>(`/cofrinhos/${created.id}/deposit`, 'POST', {
+        amount: Number(initialDeposit.toFixed(2)),
+        month: targetMes,
+        movement_date: new Date().toISOString().split('T')[0],
+        description: `Aporte inicial no cofrinho: ${cofrinho.nome}`,
+        register_expense: true,
       });
+
+      setCofrinhos((prev) => prev.map((item) => (item.id === String(created.id) ? mapCofrinho(result.cofrinho) : item)));
+      if (result.expense) {
+        setDividas((prev) => [...prev, mapDivida(result.expense!)]);
+      }
     }
 
     return true;
@@ -447,7 +493,10 @@ const useFinanceDataInternal = () => {
     const updated = await apiRequest<CofrinhoApi>(`/cofrinhos/${id}`, 'PATCH', {
       nome: updates.nome ?? existing.nome,
       descricao: updates.descricao ?? existing.descricao,
+      type: updates.type ?? existing.type,
       saldo: updates.saldo ?? existing.saldo,
+      minimum_goal: updates.minimumGoal ?? existing.minimumGoal,
+      target_goal: updates.targetGoal ?? existing.targetGoal,
     });
 
     setCofrinhos((prev) => prev.map((c) => (c.id === id ? mapCofrinho(updated) : c)));
@@ -461,43 +510,44 @@ const useFinanceDataInternal = () => {
   const depositToCofrinho = async (id: string, amount: number, mes?: string): Promise<boolean> => {
     if (amount <= 0) return false;
     const targetMes = mes || new Date().toISOString().slice(0, 7);
-    const bal = getBalancoMensal(targetMes);
-
-    if (amount > bal.saldoMes) {
-      return false;
-    }
 
     const c = cofrinhos.find((x) => x.id === id);
     if (!c) return false;
 
-    await addDivida({
-      mes: targetMes,
-      valor: Number(amount.toFixed(2)),
-      motivo: `Transfer to cofrinho: ${c.nome}`,
-      categoria: 'outro',
-      data: new Date().toISOString().split('T')[0],
-      status: 'aberta',
+    const result = await apiRequest<{ cofrinho: CofrinhoApi; expense?: DividaApi }>(`/cofrinhos/${id}/deposit`, 'POST', {
+      amount: Number(amount.toFixed(2)),
+      month: targetMes,
+      movement_date: new Date().toISOString().split('T')[0],
+      description: `Aporte no cofrinho: ${c.nome}`,
+      register_expense: true,
     });
 
-    await updateCofrinho(id, { saldo: Number((c.saldo + amount).toFixed(2)) });
+    setCofrinhos((prev) => prev.map((item) => (item.id === id ? mapCofrinho(result.cofrinho) : item)));
+    if (result.expense) {
+      setDividas((prev) => [...prev, mapDivida(result.expense!)]);
+    }
     return true;
   };
 
-  const withdrawFromCofrinho = async (id: string, amount: number, mes?: string) => {
+  const withdrawFromCofrinho = async (id: string, amount: number, mes?: string, registerExpense?: boolean) => {
     if (amount <= 0) return;
     const c = cofrinhos.find((x) => x.id === id);
     if (!c) return;
     if (amount > c.saldo) return;
     const targetMes = mes || new Date().toISOString().slice(0, 7);
 
-    await addRenda({
-      mes: targetMes,
-      valor: Number(amount.toFixed(2)),
-      origem: `Cofrinho: ${c.nome}`,
-      data: new Date().toISOString().split('T')[0],
+    const result = await apiRequest<{ cofrinho: CofrinhoApi; expense?: DividaApi }>(`/cofrinhos/${id}/withdraw`, 'POST', {
+      amount: Number(amount.toFixed(2)),
+      month: targetMes,
+      movement_date: new Date().toISOString().split('T')[0],
+      description: c.type === 'PREPAYMENT_FUND' ? `Amortização: ${c.nome}` : `Retirada do cofrinho: ${c.nome}`,
+      register_expense: registerExpense ?? c.type === 'PREPAYMENT_FUND',
     });
 
-    await updateCofrinho(id, { saldo: Number((c.saldo - amount).toFixed(2)) });
+    setCofrinhos((prev) => prev.map((item) => (item.id === id ? mapCofrinho(result.cofrinho) : item)));
+    if (result.expense) {
+      setDividas((prev) => [...prev, mapDivida(result.expense!)]);
+    }
   };
 
   const getParcelamentosByCartao = (cartaoId: string) => {
@@ -658,6 +708,7 @@ const useFinanceDataInternal = () => {
     parcelamentos,
     cofrinhos,
     addRenda,
+    updateRenda,
     addDivida,
     addDividasFixas,
     addRendas,

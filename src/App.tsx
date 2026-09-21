@@ -6,7 +6,6 @@ import { ThemeProvider } from 'next-themes';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
-import TopNav from '@/components/TopNav';
 import Rendas from "./pages/Rendas";
 import Despesas from "./pages/Despesas";
 import Cartoes from "./pages/Cartoes";
@@ -15,6 +14,10 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import CentralFinanceira from "./pages/CentralFinanceira";
+import Settings from "./pages/Settings";
+import Financiamentos from "./pages/Financiamentos";
+import AppShell from "@/components/AppShell";
 import { FinanceDataProvider } from "@/hooks/useFinanceData";
 
 type RequireAuthProps = {
@@ -32,71 +35,29 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
   return children;
 };
 
-const AppContent = () => {
-  const location = useLocation();
-  const hideTopNavPaths = ['/', '/login', '/register'];
-  const isLandingLike = hideTopNavPaths.includes(location.pathname);
+const privatePage = (page: JSX.Element) => (
+  <RequireAuth>
+    <AppShell>{page}</AppShell>
+  </RequireAuth>
+);
 
+const AppContent = () => {
   return (
-    <>
-      {!isLandingLike && <TopNav />}
-      <div className={!isLandingLike ? "pt-16 md:pt-20" : ""}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/profile"
-            element={(
-              <RequireAuth>
-                <Profile />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/app"
-            element={(
-              <RequireAuth>
-                <Dashboard />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/rendas"
-            element={(
-              <RequireAuth>
-                <Rendas />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/despesas"
-            element={(
-              <RequireAuth>
-                <Despesas />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/cartoes"
-            element={(
-              <RequireAuth>
-                <Cartoes />
-              </RequireAuth>
-            )}
-          />
-          <Route
-            path="/cofrinhos"
-            element={(
-              <RequireAuth>
-                <Cofrinhos />
-              </RequireAuth>
-            )}
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/profile" element={privatePage(<Profile />)} />
+      <Route path="/central" element={privatePage(<CentralFinanceira />)} />
+      <Route path="/settings" element={privatePage(<Settings />)} />
+      <Route path="/financiamentos" element={privatePage(<Financiamentos />)} />
+      <Route path="/app" element={privatePage(<Dashboard />)} />
+      <Route path="/rendas" element={privatePage(<Rendas />)} />
+      <Route path="/despesas" element={privatePage(<Despesas />)} />
+      <Route path="/cartoes" element={privatePage(<Cartoes />)} />
+      <Route path="/cofrinhos" element={privatePage(<Cofrinhos />)} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 

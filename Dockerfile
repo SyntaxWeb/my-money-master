@@ -1,28 +1,25 @@
-# Etapa 1: Build da aplicação
 FROM node:20-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
+RUN npm ci --include=dev --foreground-scripts --no-audit --no-fund
+
 COPY . .
 
-RUN npm install
+ARG VITE_API_BASE_URL=https://api-financeiro.syntaxweb.com.br/api
+ARG VITE_GOOGLE_CLIENT_ID=
+
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+
 RUN npm run build
 
-# Etapa 2: Servir com Nginx
-FROM nginx:alpine
+FROM ghcr.io/syntaxweb/php-base:8.3-alpine
 
-# Apagar conteúdo padrão
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /var/www/html
 
-# Configuração customizada
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/http.d/default.conf
+COPY --from=build /app/dist /var/www/html/public
 
-# Copiar build
-COPY --from=build /app/dist /usr/share/nginx/html
-
-EXPOSE 4000
-
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8000

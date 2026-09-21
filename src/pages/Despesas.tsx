@@ -11,6 +11,13 @@ import { toast } from 'sonner';
 
 export default function Despesas() {
   const { dividas, addDivida, addDividasFixas, updateDivida, deleteDivida, cartoes, addParcelamento } = useFinanceData();
+  const addMonthsToMonth = (month: string, monthsToAdd: number) => {
+    const [year, monthNumber] = month.split('-').map(Number);
+    const date = new Date(year, monthNumber - 1 + monthsToAdd, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const getCardInvoiceMonth = (purchaseDate: string) => addMonthsToMonth(purchaseDate.slice(0, 7), 1);
+
   const [formData, setFormData] = useState({
     mes: new Date().toISOString().slice(0, 7),
     valor: '',
@@ -44,6 +51,8 @@ export default function Despesas() {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
+    const mesFaturaCartao = getCardInvoiceMonth(formData.data);
+
     // If category is cartao and payment is parcelado, create parcelamento and schedule installments
     if (formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado') {
       if (!formData.cartaoId) {
@@ -58,17 +67,6 @@ export default function Despesas() {
       const parcelaAtual = Number(formData.parcelaAtual) || 1;
       const numeroParcelas = Number(formData.numeroParcelas);
       const valorParcela = parseFloat(formData.valor);
-      const motivoComParcela = `${formData.motivo} (${parcelaAtual}/${numeroParcelas})`;
-
-      await addDivida({
-        mes: formData.mes,
-        valor: valorParcela,
-        motivo: motivoComParcela,
-        categoria: 'cartao',
-        data: formData.data,
-        status: 'aberta',
-        cartaoId: formData.cartaoId,
-      });
 
       // compute start month for parcelamento
       const subtractMonthsStr = (base: string, monthsToSubtract: number) => {
@@ -77,7 +75,7 @@ export default function Despesas() {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       };
 
-      const mesInicio = subtractMonthsStr(formData.mes, parcelaAtual - 1);
+      const mesInicio = subtractMonthsStr(mesFaturaCartao, parcelaAtual - 1);
       const valorTotal = Number((valorParcela * numeroParcelas).toFixed(2));
 
       await addParcelamento({
@@ -90,7 +88,7 @@ export default function Despesas() {
         categoria: 'cartao',
       });
 
-      toast.success('Despesa parcelada cadastrada e parcelas agendadas.');
+      toast.success(`Despesa parcelada cadastrada na fatura de ${mesFaturaCartao}.`);
       setFormData({
         mes: formData.mes,
         valor: '',
@@ -138,7 +136,7 @@ export default function Despesas() {
 
     // Default add single divida
     await addDivida({
-      mes: formData.mes,
+      mes: formData.categoria === 'cartao' ? mesFaturaCartao : formData.mes,
       valor: parseFloat(formData.valor),
       motivo: formData.motivo,
       categoria: formData.categoria,
@@ -146,7 +144,11 @@ export default function Despesas() {
       status: 'aberta',
       ...(formData.categoria === 'cartao' && formData.cartaoId ? { cartaoId: formData.cartaoId } : {}),
     });
-    toast.success('Despesa cadastrada com sucesso!');
+    toast.success(
+      formData.categoria === 'cartao'
+        ? `Despesa cadastrada na fatura de ${mesFaturaCartao}.`
+        : 'Despesa cadastrada com sucesso!',
+    );
     setFormData({
       mes: formData.mes,
       valor: '',
@@ -175,6 +177,7 @@ export default function Despesas() {
     variavel: 'Variável',
     outro: 'Outro',
   };
+  const mesFaturaCartaoPreview = getCardInvoiceMonth(formData.data);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -196,17 +199,23 @@ export default function Despesas() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="mes">Mês</Label>
+                  <Label htmlFor="mes">{formData.categoria === 'cartao' ? 'Mês de referência' : 'Mês'}</Label>
                   <Input
                     id="mes"
                     type="month"
                     value={formData.mes}
                     onChange={(e) => setFormData({ ...formData, mes: e.target.value })}
+                    disabled={formData.categoria === 'cartao'}
                     required
                   />
+                  {formData.categoria === 'cartao' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      A fatura será lançada automaticamente em {mesFaturaCartaoPreview}.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="data">Data da Despesa</Label>
+                  <Label htmlFor="data">{formData.categoria === 'cartao' ? 'Data da compra' : 'Data da Despesa'}</Label>
                   <Input
                     id="data"
                     type="date"
@@ -326,7 +335,9 @@ export default function Despesas() {
                   </div>
                 )}
                 {formData.categoria === 'cartao' && formData.tipoPagamento === 'parcelado' && (
-                  <p className="text-sm text-muted-foreground md:col-span-2">Os lançamentos das próximas parcelas serão criados automaticamente no cartão selecionado.</p>
+                  <p className="text-sm text-muted-foreground md:col-span-2">
+                    A primeira parcela entra na fatura de {mesFaturaCartaoPreview}; as demais seguem nos meses seguintes.
+                  </p>
                 )}
                 <div className="md:col-span-2">
                   <Label htmlFor="motivo">Motivo / Descrição</Label>

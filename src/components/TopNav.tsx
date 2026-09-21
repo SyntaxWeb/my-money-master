@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '@/assets/syntaxweb-logo.jpg';
 import { Button } from '@/components/ui/button';
-import { Plus, Menu, Download } from 'lucide-react';
+import { Plus, Menu, Download, LayoutDashboard } from 'lucide-react';
 import { ImportDialog } from '@/components/ImportDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Sun, Moon } from 'lucide-react';
@@ -116,6 +116,12 @@ export default function TopNav() {
                   <Link to="/cofrinhos" onClick={() => setIsMenuOpen(false)}>
                     <Button className="w-full justify-start" variant="outline" size="default">
                       Cofrinhos
+                    </Button>
+                  </Link>
+                  <Link to="/central" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="w-full justify-start" variant="outline" size="default">
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Central
                     </Button>
                   </Link>
                   <Link to="/profile" onClick={() => setIsMenuOpen(false)}>
@@ -239,6 +245,12 @@ export default function TopNav() {
           <Link to="/cofrinhos">
             <Button variant="outline" size="sm">
               Cofrinhos
+            </Button>
+          </Link>
+          <Link to="/central">
+            <Button variant="outline" size="sm">
+              <LayoutDashboard className="w-4 h-4 mr-2" />
+              Central
             </Button>
           </Link>
           <Link to="/profile">

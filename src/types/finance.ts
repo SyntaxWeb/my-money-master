@@ -4,6 +4,10 @@ export interface Renda {
   valor: number;
   origem: string;
   data: string;
+  recurrenceGroupId?: string;
+  isRecurring?: boolean;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
 }
 
 export interface Divida {
@@ -69,10 +73,23 @@ export interface Parcelamento {
   categoria: 'cartao';
 }
 
+export interface CofrinhoMovement {
+  id: string;
+  type: 'DEPOSIT' | 'WITHDRAW';
+  amount: number;
+  description?: string;
+  movementDate: string;
+  month: string;
+}
+
 export interface Cofrinho {
   id: string;
   nome: string;
   descricao?: string;
+  type?: 'GENERAL' | 'EMERGENCY_FUND' | 'PREPAYMENT_FUND';
   saldo: number;
+  minimumGoal?: number;
+  targetGoal?: number;
   criadoEm?: string; // ISO date
+  movements?: CofrinhoMovement[];
 }
