@@ -1,5 +1,9 @@
 const DEFAULT_API_BASE_URL = "http://localhost:8000/api";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const configuredApiUrl = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiUrlWithoutTrailingSlash = configuredApiUrl.trim().replace(/\/+$/, "");
+const API_BASE_URL = /\/api$/i.test(apiUrlWithoutTrailingSlash)
+  ? apiUrlWithoutTrailingSlash
+  : `${apiUrlWithoutTrailingSlash}/api`;
 
 if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.DEV) {
   console.warn(`VITE_API_BASE_URL não definido, usando padrão: ${DEFAULT_API_BASE_URL}`);
